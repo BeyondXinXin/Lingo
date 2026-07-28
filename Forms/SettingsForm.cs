@@ -33,11 +33,19 @@ internal sealed class SettingsForm : Form
     private readonly ComboBox _baiduToCombo;
 
     private readonly CheckBox _customEnabledCheck;
+    private readonly ComboBox _apiSelector;
+    private readonly DarkButton _apiAddButton;
+    private readonly DarkButton _apiRemoveButton;
+    private readonly TextBox _customNameBox;
     private readonly TextBox _endpointBox;
     private readonly TextBox _apiKeyBox;
     private readonly TextBox _modelBox;
     private readonly TextBox _promptBox;
     private readonly NumericUpDown _timeoutNumeric;
+
+    // 模型翻译配置的工作副本，字段区只编辑当前选中项
+    private readonly List<CustomApiSettings> _apis;
+    private int _currentApiIndex = -1;
 
     private readonly List<(TabLabel Tab, Control Page)> _tabs = [];
 
@@ -51,7 +59,7 @@ internal sealed class SettingsForm : Form
         MaximizeBox = false;
         MinimizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(450, 500);
+        ClientSize = new Size(460, 560);
         BackColor = Theme.MainBg;
         ForeColor = Theme.Text;
         Font = new Font("Microsoft YaHei UI", 9F);
@@ -72,24 +80,41 @@ internal sealed class SettingsForm : Form
         _baiduToCombo = CreateLanguageCombo(includeFollowDefault: true, includeAuto: false);
         SelectLanguage(_baiduToCombo, settings.Baidu.TargetLanguage, fallback: string.Empty);
 
-        _customEnabledCheck = CreateCheckBox("启用模型翻译（OpenAI 兼容）", settings.CustomApi.Enabled);
-        _endpointBox = CreateTextBox(settings.CustomApi.Endpoint);
-        _apiKeyBox = CreateTextBox(settings.CustomApi.ApiKey);
+        _apis = [.. settings.CustomApis.Select(Clone)];
+        _apiSelector = new ComboBox
+        {
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Theme.TweakBg,
+            ForeColor = Theme.Text,
+            Width = 168,
+        };
+        _apiSelector.SelectedIndexChanged += OnApiSelectionChanged;
+        _apiAddButton = new DarkButton { Text = "添加", Size = new Size(54, 27), Margin = new Padding(8, 0, 0, 0) };
+        _apiRemoveButton = new DarkButton { Text = "删除", Size = new Size(54, 27), Margin = new Padding(6, 0, 0, 0) };
+        _apiAddButton.Click += OnApiAddClicked;
+        _apiRemoveButton.Click += OnApiRemoveClicked;
+
+        _customEnabledCheck = CreateCheckBox("启用该模型翻译（OpenAI 兼容）", false);
+        _customNameBox = CreateTextBox(string.Empty);
+        _endpointBox = CreateTextBox(string.Empty);
+        _apiKeyBox = CreateTextBox(string.Empty);
         _apiKeyBox.UseSystemPasswordChar = true;
-        _modelBox = CreateTextBox(settings.CustomApi.Model);
-        _promptBox = CreateTextBox(settings.CustomApi.Prompt);
+        _modelBox = CreateTextBox(string.Empty);
+        _promptBox = CreateTextBox(string.Empty);
         _promptBox.Multiline = true;
         _promptBox.ScrollBars = ScrollBars.Vertical;
         _timeoutNumeric = new NumericUpDown
         {
             Minimum = 5,
             Maximum = 300,
-            Value = Math.Clamp(settings.CustomApi.TimeoutSeconds, 5, 300),
+            Value = 30,
             BackColor = Theme.StressBg,
             ForeColor = Theme.Text,
         };
 
         BuildLayout();
+        RefreshApiSelector(_apis.Count > 0 ? 0 : -1);
     }
 
     public AppSettings? Result { get; private set; }
@@ -150,7 +175,18 @@ internal sealed class SettingsForm : Form
         AddRow(baiduPage, "目标语言", _baiduToCombo);
 
         TableLayoutPanel customPage = CreatePage();
+        FlowLayoutPanel apiBar = new()
+        {
+            AutoSize = true,
+            WrapContents = false,
+            BackColor = Theme.StressBg,
+        };
+        apiBar.Controls.Add(_apiSelector);
+        apiBar.Controls.Add(_apiAddButton);
+        apiBar.Controls.Add(_apiRemoveButton);
+        AddRow(customPage, "模型配置", apiBar);
         AddRow(customPage, string.Empty, _customEnabledCheck);
+        AddRow(customPage, "显示名称", Rounded(_customNameBox));
         AddRow(customPage, "Endpoint", Rounded(_endpointBox));
         AddRow(customPage, "API 密钥", Rounded(_apiKeyBox));
         AddRow(customPage, "模型名称", Rounded(_modelBox));
@@ -205,7 +241,7 @@ internal sealed class SettingsForm : Form
             return;
         }
 
-        string prompt = _promptBox.Text.Trim();
+        CommitApiFields();
         Result = new AppSettings
         {
             Hotkey = hotkey,
@@ -219,15 +255,7 @@ internal sealed class SettingsForm : Form
                 SourceLanguage = SelectedLanguage(_baiduFromCombo),
                 TargetLanguage = SelectedLanguage(_baiduToCombo),
             },
-            CustomApi = new CustomApiSettings
-            {
-                Enabled = _customEnabledCheck.Checked,
-                Endpoint = _endpointBox.Text.Trim(),
-                ApiKey = _apiKeyBox.Text.Trim(),
-                Model = _modelBox.Text.Trim(),
-                Prompt = prompt.Length == 0 ? CustomApiSettings.DefaultPrompt : prompt,
-                TimeoutSeconds = (int)_timeoutNumeric.Value,
-            },
+            CustomApis = [.. _apis.Select(Clone)],
             TranslateWindow = _original.TranslateWindow,
         };
 
@@ -245,6 +273,117 @@ internal sealed class SettingsForm : Form
             _hotkeyBox.Text = formatted;
         }
     }
+
+    private void OnApiSelectionChanged(object? sender, EventArgs e)
+    {
+        if (_apiSelector.SelectedIndex == _currentApiIndex)
+        {
+            return;
+        }
+
+        CommitApiFields();
+        _currentApiIndex = _apiSelector.SelectedIndex;
+        LoadApiFields();
+    }
+
+    private void OnApiAddClicked(object? sender, EventArgs e)
+    {
+        CommitApiFields();
+        _apis.Add(new CustomApiSettings { Enabled = true });
+        RefreshApiSelector(_apis.Count - 1);
+    }
+
+    private void OnApiRemoveClicked(object? sender, EventArgs e)
+    {
+        if (_currentApiIndex < 0 || _currentApiIndex >= _apis.Count)
+        {
+            return;
+        }
+
+        int removed = _currentApiIndex;
+        _apis.RemoveAt(removed);
+        _currentApiIndex = -1; // 已删除的项不再回写字段
+        RefreshApiSelector(Math.Min(removed, _apis.Count - 1));
+    }
+
+    private void RefreshApiSelector(int selectIndex)
+    {
+        _currentApiIndex = -1;
+        _apiSelector.Items.Clear();
+        for (int i = 0; i < _apis.Count; i++)
+        {
+            _apiSelector.Items.Add(ApiDisplayName(_apis[i], i));
+        }
+
+        if (selectIndex >= 0 && selectIndex < _apis.Count)
+        {
+            _apiSelector.SelectedIndex = selectIndex;
+        }
+        else
+        {
+            LoadApiFields();
+        }
+    }
+
+    // 把字段区内容写回当前选中的配置项
+    private void CommitApiFields()
+    {
+        if (_currentApiIndex < 0 || _currentApiIndex >= _apis.Count)
+        {
+            return;
+        }
+
+        CustomApiSettings api = _apis[_currentApiIndex];
+        api.Enabled = _customEnabledCheck.Checked;
+        api.Name = _customNameBox.Text.Trim();
+        api.Endpoint = _endpointBox.Text.Trim();
+        api.ApiKey = _apiKeyBox.Text.Trim();
+        api.Model = _modelBox.Text.Trim();
+        string prompt = _promptBox.Text.Trim();
+        api.Prompt = prompt.Length == 0 ? CustomApiSettings.DefaultPrompt : prompt;
+        api.TimeoutSeconds = (int)_timeoutNumeric.Value;
+        _apiSelector.Items[_currentApiIndex] = ApiDisplayName(api, _currentApiIndex);
+    }
+
+    private void LoadApiFields()
+    {
+        bool hasSelection = _currentApiIndex >= 0 && _currentApiIndex < _apis.Count;
+        CustomApiSettings api = hasSelection ? _apis[_currentApiIndex] : new CustomApiSettings();
+        _customEnabledCheck.Checked = hasSelection && api.Enabled;
+        _customNameBox.Text = api.Name;
+        _endpointBox.Text = api.Endpoint;
+        _apiKeyBox.Text = api.ApiKey;
+        _modelBox.Text = api.Model;
+        _promptBox.Text = api.Prompt;
+        _timeoutNumeric.Value = Math.Clamp(api.TimeoutSeconds, 5, 300);
+
+        foreach (Control control in new Control[]
+                 {
+                     _customEnabledCheck, _customNameBox, _endpointBox,
+                     _apiKeyBox, _modelBox, _promptBox, _timeoutNumeric,
+                 })
+        {
+            control.Enabled = hasSelection;
+        }
+
+        _apiRemoveButton.Enabled = hasSelection;
+    }
+
+    private static string ApiDisplayName(CustomApiSettings api, int index) =>
+        !string.IsNullOrWhiteSpace(api.Name) ? api.Name
+        : !string.IsNullOrWhiteSpace(api.Model) ? api.Model
+        : $"模型 {index + 1}";
+
+    private static CustomApiSettings Clone(CustomApiSettings api) => new()
+    {
+        Enabled = api.Enabled,
+        Name = api.Name,
+        Endpoint = api.Endpoint,
+        ApiKey = api.ApiKey,
+        Model = api.Model,
+        Prompt = api.Prompt,
+        TimeoutSeconds = api.TimeoutSeconds,
+    };
 
     private static TextBox CreateTextBox(string text) => new()
     {

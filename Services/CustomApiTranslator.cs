@@ -19,7 +19,10 @@ internal sealed class CustomApiTranslator : ITranslator
         _settings = settings;
     }
 
-    public string Name => "模型翻译";
+    // 面板标题优先用显示名称，其次模型名
+    public string Name => !string.IsNullOrWhiteSpace(_settings.Name) ? _settings.Name
+        : !string.IsNullOrWhiteSpace(_settings.Model) ? _settings.Model
+        : "模型翻译";
 
     public async Task<TranslationResult> TranslateAsync(string text, CancellationToken cancellationToken)
     {

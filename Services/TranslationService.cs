@@ -19,16 +19,19 @@ internal sealed class TranslationService : IDisposable
             translators.Add(new BaiduTranslator(SharedHttpClient, settings.Baidu, settings.DefaultTargetLanguage));
         }
 
-        if (settings.CustomApi.Enabled)
+        foreach (CustomApiSettings api in settings.CustomApis)
         {
-            translators.Add(new CustomApiTranslator(SharedHttpClient, settings.CustomApi));
+            if (api.Enabled)
+            {
+                translators.Add(new CustomApiTranslator(SharedHttpClient, api));
+            }
         }
 
         return translators;
     }
 
-    // onResult 在线程池线程上回调，UI 层需自行切回 UI 线程
-    public void StartTranslation(string text, IReadOnlyList<ITranslator> translators, Action<TranslationResult> onResult)
+    // onResult 在线程池线程上回调，带回发起的翻译器实例供 UI 层定位面板；UI 层需自行切回 UI 线程
+    public void StartTranslation(string text, IReadOnlyList<ITranslator> translators, Action<ITranslator, TranslationResult> onResult)
     {
         CancelActive();
 
@@ -57,7 +60,7 @@ internal sealed class TranslationService : IDisposable
         ITranslator translator,
         string text,
         CancellationToken cancellationToken,
-        Action<TranslationResult> onResult)
+        Action<ITranslator, TranslationResult> onResult)
     {
         TranslationResult result;
         try
@@ -76,7 +79,7 @@ internal sealed class TranslationService : IDisposable
 
         if (!cancellationToken.IsCancellationRequested)
         {
-            onResult(result);
+            onResult(translator, result);
         }
     }
 

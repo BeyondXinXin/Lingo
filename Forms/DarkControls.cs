@@ -18,6 +18,10 @@ internal class CardPanel : Panel
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public int CornerRadius { get; set; } = 8;
 
+    // AIxyz 翻译编辑框为 2px 轮廓，默认 1px 用于设置页等普通卡片
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public float BorderWidth { get; set; } = 1F;
+
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public Color BorderColor
     {
@@ -36,7 +40,7 @@ internal class CardPanel : Panel
         e.Graphics.FillRectangle(parentBrush, ClientRectangle);
 
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        using GraphicsPath path = Theme.RoundedRectangle(new Rectangle(0, 0, Width - 1, Height - 1), CornerRadius);
+        using GraphicsPath path = Theme.RoundedRectangle(BorderBounds(), CornerRadius);
         using SolidBrush background = new(BackColor);
         e.Graphics.FillPath(background, path);
     }
@@ -44,10 +48,17 @@ internal class CardPanel : Panel
     protected override void OnPaint(PaintEventArgs e)
     {
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        using GraphicsPath path = Theme.RoundedRectangle(new Rectangle(0, 0, Width - 1, Height - 1), CornerRadius);
-        using Pen pen = new(_borderColor);
+        using GraphicsPath path = Theme.RoundedRectangle(BorderBounds(), CornerRadius);
+        using Pen pen = new(_borderColor, BorderWidth);
         e.Graphics.DrawPath(pen, path);
         base.OnPaint(e);
+    }
+
+    // 粗边框需向内收缩，避免描边被控件边缘裁剪
+    private Rectangle BorderBounds()
+    {
+        int inset = (int)Math.Floor(BorderWidth / 2F);
+        return new Rectangle(inset, inset, Width - inset * 2 - 1, Height - inset * 2 - 1);
     }
 }
 
@@ -144,5 +155,83 @@ internal sealed class DarkButton : Button
 
         TextRenderer.DrawText(g, Text, Font, ClientRectangle, ForeColor,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+    }
+}
+
+// 无边框图标按钮：用 Material Symbols 字体绘制单个图标，悬停时显示圆角背景
+internal sealed class IconButton : Button
+{
+    private static readonly Font GlyphFont = IconFont.Create(11F);
+
+    private readonly char _glyph;
+    private bool _hovered;
+    private bool _pressed;
+
+    public IconButton(char glyph, string tooltip)
+    {
+        _glyph = glyph;
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                 ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+        FlatStyle = FlatStyle.Flat;
+        FlatAppearance.BorderSize = 0;
+        Size = new Size(26, 24);
+        TabStop = false;
+        Cursor = Cursors.Hand;
+        AccessibleName = tooltip;
+        new ToolTip().SetToolTip(this, tooltip);
+    }
+
+    protected override void OnMouseEnter(EventArgs e)
+    {
+        _hovered = true;
+        Invalidate();
+        base.OnMouseEnter(e);
+    }
+
+    protected override void OnMouseLeave(EventArgs e)
+    {
+        _hovered = false;
+        _pressed = false;
+        Invalidate();
+        base.OnMouseLeave(e);
+    }
+
+    protected override void OnMouseDown(MouseEventArgs mevent)
+    {
+        _pressed = true;
+        Invalidate();
+        base.OnMouseDown(mevent);
+    }
+
+    protected override void OnMouseUp(MouseEventArgs mevent)
+    {
+        _pressed = false;
+        Invalidate();
+        base.OnMouseUp(mevent);
+    }
+
+    protected override void OnPaint(PaintEventArgs pevent)
+    {
+        Graphics g = pevent.Graphics;
+        using SolidBrush parentBrush = new(Parent?.BackColor ?? Theme.MainBg);
+        g.FillRectangle(parentBrush, ClientRectangle);
+
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        if (_hovered || _pressed)
+        {
+            using GraphicsPath path = Theme.RoundedRectangle(new Rectangle(0, 0, Width - 1, Height - 1), 5);
+            using SolidBrush hoverBrush = new(_pressed ? Theme.PressedBg : Theme.HoverBg);
+            g.FillPath(hoverBrush, path);
+        }
+
+        // 私有字体必须走 GDI+ 绘制，TextRenderer(GDI) 无法使用 PrivateFontCollection
+        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+        using SolidBrush textBrush = new(_hovered ? Color.White : Theme.Text);
+        using StringFormat format = new()
+        {
+            Alignment = StringAlignment.Center,
+            LineAlignment = StringAlignment.Center,
+        };
+        g.DrawString(_glyph.ToString(), GlyphFont, textBrush, ClientRectangle, format);
     }
 }

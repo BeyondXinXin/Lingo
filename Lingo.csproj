@@ -32,6 +32,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Assets\Lingo.ico" LogicalName="Lingo.Assets.Lingo.ico" />
+    <EmbeddedResource Include="Assets\MaterialSymbolsRounded.ttf" LogicalName="Lingo.Assets.MaterialSymbolsRounded.ttf" />
   </ItemGroup>
 
 </Project>

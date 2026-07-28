@@ -23,7 +23,7 @@ internal static class SettingsStore
             }
 
             AppSettings? settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsPath));
-            return settings ?? new AppSettings();
+            return Migrate(settings ?? new AppSettings());
         }
         catch (Exception ex)
         {
@@ -44,6 +44,22 @@ internal static class SettingsStore
         {
             AppLogger.Error("配置保存失败", ex);
         }
+    }
+
+    // 旧版配置只有单个 CustomApi 字段，加载后并入 CustomApis 列表
+    private static AppSettings Migrate(AppSettings settings)
+    {
+        if (settings.CustomApi is not null)
+        {
+            if (settings.CustomApis.Count == 0)
+            {
+                settings.CustomApis.Add(settings.CustomApi);
+            }
+
+            settings.CustomApi = null;
+        }
+
+        return settings;
     }
 
     private static void BackupCorruptedFile()

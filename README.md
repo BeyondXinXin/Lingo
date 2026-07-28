@@ -12,9 +12,9 @@
 | --- | --- |
 | 托盘常驻 | 无主窗口，托盘菜单：翻译剪贴板 / 设置 / 退出 |
 | 全局快捷键 | 默认 `Ctrl+Alt+T`，可在设置中修改；被占用时气泡提示，不影响运行 |
-| 翻译浮窗 | 深色主题、弹出时自动置顶一次、可拖动缩放（最小可缩到一行输入）、Esc 或关闭按钮隐藏（不退出）、记忆位置与大小、优先显示在鼠标所在屏幕；支持直接输入文本按 Enter 翻译（Shift+Enter 换行） |
+| 翻译浮窗 | 深色主题、弹出时自动置顶一次、可拖动缩放（最小可缩到一行输入）、Esc 或关闭按钮隐藏（不退出）、记忆位置与大小、优先显示在鼠标所在屏幕；输入停顿自动翻译，Enter 立即翻译（Shift+Enter 换行）；结果栏悬停显示朗读/复制图标 |
 | 百度翻译 | 通用文本翻译 API，需自备 AppID / SecretKey；目标为中文且原文已是中文时自动改译英文 |
-| 模型翻译 | 任意 OpenAI Chat Completions 兼容服务（OpenAI / DeepSeek / Ollama 等），可自定义 Prompt（`{text}` 为原文占位符）与超时 |
+| 模型翻译 | 任意 OpenAI Chat Completions 兼容服务（OpenAI / DeepSeek / Ollama 等），支持配置多个并发翻译，面板标题显示自定义名称或模型名；可自定义 Prompt（`{text}` 为原文占位符）与超时 |
 | 文本预处理 | 自动将连字符 / 下划线还原为空格、拆分驼峰命名，适合翻译代码标识符 |
 | 取消机制 | 连续触发翻译时自动取消上一轮未完成的请求 |
 
@@ -36,7 +36,7 @@ dotnet run --project Lingo.csproj
 
 - **常规**：全局快捷键、目标语言、开机自启
 - **百度翻译**：启用开关、App ID、Secret Key（申请地址：https://fanyi-api.baidu.com/ ）、源/目标语言
-- **模型翻译**：启用开关、Endpoint（形如 `https://api.openai.com/v1/chat/completions`）、API 密钥、模型名、Prompt、超时秒数
+- **模型翻译**：支持添加多个模型配置，每个配置含启用开关、显示名称、Endpoint（形如 `https://api.openai.com/v1/chat/completions`）、API 密钥、模型名、Prompt、超时秒数
 
 配置保存在 `%LocalAppData%\Lingo\settings.json`；文件损坏时会自动备份为 `settings.corrupted.json` 并恢复默认。日志位于同目录 `lingo.log`（不记录任何密钥）。
 

@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Lingo.Models;
 
 internal sealed class AppSettings
@@ -6,8 +8,12 @@ internal sealed class AppSettings
     public bool LaunchAtStartup { get; set; }
     public string DefaultTargetLanguage { get; set; } = "zh";
     public BaiduSettings Baidu { get; set; } = new();
-    public CustomApiSettings CustomApi { get; set; } = new();
+    public List<CustomApiSettings> CustomApis { get; set; } = [];
     public WindowBounds TranslateWindow { get; set; } = new();
+
+    // 旧版单模型配置，仅用于加载时迁移到 CustomApis
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CustomApiSettings? CustomApi { get; set; }
 }
 
 internal sealed class BaiduSettings
@@ -31,6 +37,9 @@ internal sealed class CustomApiSettings
         "禁止添加任何解释、注释或表情，只输出译文。\n\n待翻译文本：\n{text}";
 
     public bool Enabled { get; set; }
+
+    // 面板标题显示的名称，留空时退化为模型名
+    public string Name { get; set; } = string.Empty;
     public string Endpoint { get; set; } = "https://api.openai.com/v1/chat/completions";
     public string ApiKey { get; set; } = string.Empty;
     public string Model { get; set; } = string.Empty;

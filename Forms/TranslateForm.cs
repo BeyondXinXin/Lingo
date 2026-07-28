@@ -13,9 +13,12 @@ internal sealed class TranslateForm : Form
 
     private readonly TextBox _sourceBox;
     private readonly CardPanel _sourceCard;
-    private readonly ResultPanel _baiduPanel;
-    private readonly ResultPanel _customPanel;
     private readonly TableLayoutPanel _layout;
+    private readonly List<ResultPanel> _panels = [];
+    private readonly System.Windows.Forms.Timer _autoTranslateTimer;
+
+    private bool _suppressTextChanged;
+    private string _lastTranslatedText = string.Empty;
 
     public TranslateForm(Func<AppSettings> getSettings, Action persistSettings, TranslationService translationService)
     {
@@ -25,7 +28,10 @@ internal sealed class TranslateForm : Form
 
         Text = "Lingo";
         Icon = AppIcon.Get();
-        FormBorderStyle = FormBorderStyle.SizableToolWindow;
+        // Sizable 才会在标题栏显示窗口图标，禁用最大化/最小化保持精简
+        FormBorderStyle = FormBorderStyle.Sizable;
+        MaximizeBox = false;
+        MinimizeBox = false;
         StartPosition = FormStartPosition.Manual;
         ShowInTaskbar = false;
         KeyPreview = true;
@@ -39,25 +45,24 @@ internal sealed class TranslateForm : Form
             Dock = DockStyle.Fill,
             Multiline = true,
             BorderStyle = BorderStyle.None,
-            BackColor = Theme.StressBg,
+            BackColor = Theme.MainBg,
             ForeColor = Theme.Text,
-            PlaceholderText = "输入需要翻译的文本，Enter 翻译",
+            PlaceholderText = "输入需要翻译的文本，停顿或按 Enter 翻译",
             Margin = new Padding(0),
         };
         _sourceBox.KeyDown += OnSourceBoxKeyDown;
+        _sourceBox.TextChanged += OnSourceBoxTextChanged;
         _sourceCard = new CardPanel
         {
             Dock = DockStyle.Fill,
             CornerRadius = 10,
+            BorderWidth = 2F,
+            BorderColor = Theme.BorderStrong,
+            BackColor = Theme.MainBg,
             Padding = new Padding(12, 10, 12, 10),
             Margin = new Padding(0, 0, 0, 10),
         };
         _sourceCard.Controls.Add(_sourceBox);
-
-        _baiduPanel = new ResultPanel("百度翻译");
-        _baiduPanel.Margin = new Padding(0, 0, 0, 10);
-        _customPanel = new ResultPanel("模型翻译");
-        _customPanel.Margin = new Padding(0);
 
         _layout = new TableLayoutPanel
         {
@@ -65,17 +70,21 @@ internal sealed class TranslateForm : Form
             Padding = new Padding(12),
             BackColor = Theme.MainBg,
             ColumnCount = 1,
-            RowCount = 3,
+            RowCount = 1,
         };
         _layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         // 输入区保持紧凑固定高度，缩小窗口时优先压缩结果区，最小可只剩一行输入
         _layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 68F));
-        _layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
-        _layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
         _layout.Controls.Add(_sourceCard, 0, 0);
-        _layout.Controls.Add(_baiduPanel, 0, 1);
-        _layout.Controls.Add(_customPanel, 0, 2);
         Controls.Add(_layout);
+
+        // 停止输入片刻后自动翻译，行为与 AIxyz 一致
+        _autoTranslateTimer = new System.Windows.Forms.Timer { Interval = 700 };
+        _autoTranslateTimer.Tick += (_, _) =>
+        {
+            _autoTranslateTimer.Stop();
+            StartTranslation(_sourceBox.Text.Trim(), _getSettings(), force: false);
+        };
     }
 
     public void ShowTranslation(string text)
@@ -86,15 +95,17 @@ internal sealed class TranslateForm : Form
             PositionWindow(settings);
         }
 
+        _suppressTextChanged = true;
         _sourceBox.Text = text;
         _sourceBox.SelectionStart = _sourceBox.TextLength;
+        _suppressTextChanged = false;
 
         // 弹出时置顶一次拉到前台，随后取消置顶，不遮挡其他窗口
         TopMost = true;
         Show();
         Activate();
         BeginInvoke(() => TopMost = false);
-        StartTranslation(text, settings);
+        StartTranslation(text, settings, force: true);
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -109,15 +120,28 @@ internal sealed class TranslateForm : Form
         base.OnKeyDown(e);
     }
 
-    // 输入框内 Enter 直接翻译，Shift+Enter 换行
+    // 输入框内 Enter 立即翻译，Shift+Enter 换行
     private void OnSourceBoxKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.KeyCode == Keys.Enter && !e.Shift)
         {
             e.Handled = true;
             e.SuppressKeyPress = true;
-            StartTranslation(_sourceBox.Text.Trim(), _getSettings());
+            _autoTranslateTimer.Stop();
+            StartTranslation(_sourceBox.Text.Trim(), _getSettings(), force: true);
         }
+    }
+
+    private void OnSourceBoxTextChanged(object? sender, EventArgs e)
+    {
+        if (_suppressTextChanged)
+        {
+            return;
+        }
+
+        // 防抖：每次输入都重置计时，停顿后才发起翻译
+        _autoTranslateTimer.Stop();
+        _autoTranslateTimer.Start();
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)
@@ -135,6 +159,7 @@ internal sealed class TranslateForm : Form
 
     private void HideWindow()
     {
+        _autoTranslateTimer.Stop();
         _translationService.CancelActive();
         SaveWindowBounds();
         Hide();
@@ -192,38 +217,50 @@ internal sealed class TranslateForm : Form
         size.Width,
         size.Height);
 
-    private void StartTranslation(string text, AppSettings settings)
+    private void StartTranslation(string text, AppSettings settings, bool force)
     {
-        UpdatePanelLayout(settings);
-
-        if (text.Length == 0)
-        {
-            string hint = "剪贴板中没有可翻译的文本，可在上方输入后按 Enter 翻译。";
-            _baiduPanel.ShowIdle(hint);
-            _customPanel.ShowIdle(hint);
-            return;
-        }
-
         IReadOnlyList<ITranslator> translators = TranslationService.CreateEnabledTranslators(settings);
         if (translators.Count == 0)
         {
-            string hint = "未启用任何翻译服务，请在托盘菜单打开“设置”进行配置。";
-            _baiduPanel.ShowIdle(hint);
-            _customPanel.ShowIdle(hint);
+            RebuildPanels(1);
+            _panels[0].Title = "翻译";
+            _panels[0].ShowIdle("未启用任何翻译服务，请在托盘菜单打开“设置”进行配置。");
+            _lastTranslatedText = string.Empty;
             return;
         }
 
-        if (settings.Baidu.Enabled)
+        RebuildPanels(translators.Count);
+        for (int i = 0; i < translators.Count; i++)
         {
-            _baiduPanel.ShowLoading();
+            _panels[i].Title = translators[i].Name;
         }
 
-        if (settings.CustomApi.Enabled)
+        if (text.Length == 0)
         {
-            _customPanel.ShowLoading();
+            foreach (ResultPanel panel in _panels)
+            {
+                panel.ShowIdle("剪贴板中没有可翻译的文本，可在上方输入。");
+            }
+
+            _lastTranslatedText = string.Empty;
+            return;
         }
 
-        _translationService.StartTranslation(text, translators, result =>
+        // 自动触发时跳过与上次相同的文本，避免重复请求
+        if (!force && text == _lastTranslatedText)
+        {
+            return;
+        }
+
+        _lastTranslatedText = text;
+        Dictionary<ITranslator, ResultPanel> panelMap = [];
+        for (int i = 0; i < translators.Count; i++)
+        {
+            panelMap[translators[i]] = _panels[i];
+            _panels[i].ShowLoading();
+        }
+
+        _translationService.StartTranslation(text, translators, (translator, result) =>
         {
             if (IsDisposed)
             {
@@ -232,7 +269,13 @@ internal sealed class TranslateForm : Form
 
             try
             {
-                BeginInvoke(() => ApplyResult(result));
+                BeginInvoke(() =>
+                {
+                    if (panelMap.TryGetValue(translator, out ResultPanel? panel) && !panel.IsDisposed)
+                    {
+                        panel.ShowResult(result);
+                    }
+                });
             }
             catch (InvalidOperationException)
             {
@@ -241,29 +284,48 @@ internal sealed class TranslateForm : Form
         });
     }
 
-    private void ApplyResult(TranslationResult result)
+    // 按启用的翻译服务数量增删结果面板并重排行高
+    private void RebuildPanels(int count)
     {
-        if (result.TranslatorName == _baiduPanel.TranslatorName)
+        if (_panels.Count == count)
         {
-            _baiduPanel.ShowResult(result);
+            return;
         }
-        else if (result.TranslatorName == _customPanel.TranslatorName)
+
+        _layout.SuspendLayout();
+        while (_panels.Count > count)
         {
-            _customPanel.ShowResult(result);
+            ResultPanel extra = _panels[^1];
+            _panels.RemoveAt(_panels.Count - 1);
+            _layout.Controls.Remove(extra);
+            extra.Dispose();
         }
-    }
 
-    private void UpdatePanelLayout(AppSettings settings)
-    {
-        bool anyEnabled = settings.Baidu.Enabled || settings.CustomApi.Enabled;
-        bool showBaidu = settings.Baidu.Enabled || !anyEnabled;
-        bool showCustom = settings.CustomApi.Enabled;
+        while (_panels.Count < count)
+        {
+            ResultPanel panel = new(string.Empty);
+            _panels.Add(panel);
+            _layout.Controls.Add(panel, 0, _panels.Count);
+        }
 
-        _baiduPanel.Visible = showBaidu;
-        _customPanel.Visible = showCustom;
+        _layout.RowCount = 1 + count;
+        while (_layout.RowStyles.Count > _layout.RowCount)
+        {
+            _layout.RowStyles.RemoveAt(_layout.RowStyles.Count - 1);
+        }
 
-        int visibleCount = (showBaidu ? 1 : 0) + (showCustom ? 1 : 0);
-        _layout.RowStyles[1] = new RowStyle(SizeType.Percent, showBaidu ? 100F / visibleCount : 0F);
-        _layout.RowStyles[2] = new RowStyle(SizeType.Percent, showCustom ? 100F / visibleCount : 0F);
+        while (_layout.RowStyles.Count < _layout.RowCount)
+        {
+            _layout.RowStyles.Add(new RowStyle());
+        }
+
+        for (int i = 0; i < count; i++)
+        {
+            _layout.RowStyles[i + 1] = new RowStyle(SizeType.Percent, 100F / count);
+            _layout.SetCellPosition(_panels[i], new TableLayoutPanelCellPosition(0, i + 1));
+            _panels[i].Margin = new Padding(0, 0, 0, i == count - 1 ? 0 : 10);
+        }
+
+        _layout.ResumeLayout();
     }
 }

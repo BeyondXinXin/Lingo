@@ -16,6 +16,7 @@ internal static class Theme
     public static readonly Color Danger = Color.FromArgb(224, 108, 117);
 
     public static readonly Color Border = Color.FromArgb(103, 105, 107);
+    public static readonly Color BorderStrong = Color.FromArgb(163, 165, 167); // AIxyz 翻译编辑框的亮色轮廓
     public static readonly Color BorderFocus = Color.FromArgb(29, 147, 171);
 
     public static GraphicsPath RoundedRectangle(Rectangle bounds, int radius)
