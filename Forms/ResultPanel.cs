@@ -92,6 +92,10 @@ internal sealed class ResultPanel : CardPanel
         set => _titleLabel.Text = value;
     }
 
+    // 完整展示当前内容所需的高度，供父容器按内容比例分配行高
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public int DesiredHeight => Padding.Top + _header.Height + ContentHeight() + Padding.Bottom + 6;
+
     public void ShowLoading()
     {
         _hasResult = false;

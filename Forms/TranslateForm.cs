@@ -77,6 +77,9 @@ internal sealed class TranslateForm : Form
         _layout.Controls.Add(_sourceCard, 0, 0);
         Controls.Add(_layout);
 
+        // 宽度变化会改变折行，重新按内容分配行高
+        Resize += (_, _) => UpdateRowWeights();
+
         // 停止输入片刻后自动翻译，行为与 AIxyz 一致
         _autoTranslateTimer = new System.Windows.Forms.Timer { Interval = 700 };
         _autoTranslateTimer.Tick += (_, _) =>
@@ -273,6 +276,7 @@ internal sealed class TranslateForm : Form
                     if (panelMap.TryGetValue(translator, out ResultPanel? panel) && !panel.IsDisposed)
                     {
                         panel.ShowResult(result);
+                        UpdateRowWeights();
                     }
                 });
             }
@@ -327,6 +331,32 @@ internal sealed class TranslateForm : Form
 
         _layout.ResumeLayout();
         UpdateMinimumSize(count);
+    }
+
+    // 各结果行高按内容所需高度的比例分配，内容少的面板不再占大块空白
+    private void UpdateRowWeights()
+    {
+        if (_panels.Count < 2)
+        {
+            return;
+        }
+
+        float[] weights = new float[_panels.Count];
+        float total = 0F;
+        for (int i = 0; i < _panels.Count; i++)
+        {
+            // 保底权重，避免短内容面板被压到看不清
+            weights[i] = Math.Max(96, _panels[i].DesiredHeight);
+            total += weights[i];
+        }
+
+        _layout.SuspendLayout();
+        for (int i = 0; i < _panels.Count; i++)
+        {
+            _layout.RowStyles[i + 1] = new RowStyle(SizeType.Percent, weights[i] / total * 100F);
+        }
+
+        _layout.ResumeLayout();
     }
 
     // 最小尺寸随结果面板数量变化，保证每张卡片至少能显示两行内容
