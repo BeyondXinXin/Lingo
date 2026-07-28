@@ -8,7 +8,6 @@ namespace Lingo.Forms;
 internal sealed class ResultPanel : CardPanel
 {
     private readonly Label _titleLabel;
-    private readonly Label _statusLabel;
     private readonly IconButton _speakSourceButton;
     private readonly IconButton _speakResultButton;
     private readonly IconButton _copyButton;
@@ -29,7 +28,7 @@ internal sealed class ResultPanel : CardPanel
         _header = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 26,
+            Height = 28,
             BackColor = Theme.MainBg,
         };
 
@@ -37,14 +36,7 @@ internal sealed class ResultPanel : CardPanel
         {
             Text = title,
             AutoSize = true,
-            Location = new Point(0, 5),
-            ForeColor = Theme.TextMuted,
-            BackColor = Theme.MainBg,
-        };
-
-        _statusLabel = new Label
-        {
-            AutoSize = true,
+            Location = new Point(0, 4),
             ForeColor = Theme.TextMuted,
             BackColor = Theme.MainBg,
         };
@@ -69,7 +61,6 @@ internal sealed class ResultPanel : CardPanel
         };
 
         _header.Controls.Add(_titleLabel);
-        _header.Controls.Add(_statusLabel);
         _header.Controls.Add(_speakSourceButton);
         _header.Controls.Add(_speakResultButton);
         _header.Controls.Add(_copyButton);
@@ -77,7 +68,6 @@ internal sealed class ResultPanel : CardPanel
         Controls.Add(_header);
 
         _header.Resize += (_, _) => LayoutHeader();
-        _statusLabel.SizeChanged += (_, _) => LayoutHeader();
         LayoutHeader();
 
         HookHoverTracking(this);
@@ -93,15 +83,13 @@ internal sealed class ResultPanel : CardPanel
     public void ShowLoading()
     {
         _hasResult = false;
-        _statusLabel.Text = "翻译中…";
-        SetText(string.Empty, Theme.TextMuted);
+        SetText("翻译中…", Theme.TextMuted);
         UpdateButtonVisibility();
     }
 
     public void ShowIdle(string message)
     {
         _hasResult = false;
-        _statusLabel.Text = string.Empty;
         SetText(message, Theme.TextMuted);
         UpdateButtonVisibility();
     }
@@ -111,13 +99,11 @@ internal sealed class ResultPanel : CardPanel
         if (result.Success)
         {
             _hasResult = result.Text.Length > 0;
-            _statusLabel.Text = $"{result.Elapsed.TotalSeconds:0.0}s";
             SetText(result.Text, Theme.Text);
         }
         else
         {
             _hasResult = false;
-            _statusLabel.Text = "失败";
             SetText(result.ErrorMessage, Theme.Danger);
         }
 
@@ -132,9 +118,9 @@ internal sealed class ResultPanel : CardPanel
 
     private void OnCopyClicked(object? sender, EventArgs e)
     {
-        if (_hasResult && ClipboardService.TrySetText(_textBox.Text))
+        if (_hasResult)
         {
-            _statusLabel.Text = "已复制";
+            ClipboardService.TrySetText(_textBox.Text);
         }
     }
 
@@ -153,10 +139,8 @@ internal sealed class ResultPanel : CardPanel
         foreach (IconButton button in new[] { _copyButton, _speakResultButton, _speakSourceButton })
         {
             right -= button.Width + 2;
-            button.Location = new Point(right, 1);
+            button.Location = new Point(right, 2);
         }
-
-        _statusLabel.Location = new Point(right - _statusLabel.Width - 8, 5);
     }
 
     // 鼠标移入卡片任意区域时显示图标按钮，完全移出后隐藏

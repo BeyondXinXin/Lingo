@@ -68,8 +68,8 @@ internal sealed class RoundedInput : CardPanel
     public RoundedInput(Control inner)
     {
         CornerRadius = 6;
-        Padding = new Padding(9, 6, 9, 6);
-        Height = 32;
+        Padding = new Padding(9, 7, 9, 7);
+        Height = 36;
 
         switch (inner)
         {

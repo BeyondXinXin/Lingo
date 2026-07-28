@@ -38,7 +38,6 @@ internal sealed class TranslateForm : Form
         MinimumSize = new Size(320, 150);
         BackColor = Theme.MainBg;
         ForeColor = Theme.Text;
-        Font = new Font("Microsoft YaHei UI", 9F);
 
         _sourceBox = new TextBox
         {
@@ -74,7 +73,7 @@ internal sealed class TranslateForm : Form
         };
         _layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         // 输入区保持紧凑固定高度，缩小窗口时优先压缩结果区，最小可只剩一行输入
-        _layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 68F));
+        _layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 76F));
         _layout.Controls.Add(_sourceCard, 0, 0);
         Controls.Add(_layout);
 
@@ -204,7 +203,7 @@ internal sealed class TranslateForm : Form
             return;
         }
 
-        Bounds = CenterIn(workingArea, ClampSize(new Size(560, 460), workingArea));
+        Bounds = CenterIn(workingArea, ClampSize(new Size(600, 480), workingArea));
     }
 
     private static Size ClampSize(Size size, Rectangle workingArea) => new(

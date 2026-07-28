@@ -28,7 +28,8 @@ internal static class Program
 #pragma warning disable WFO5001 // WinForms 深色模式尚在评估期 API，行为已稳定
         Application.SetColorMode(SystemColorMode.Dark);
 #pragma warning restore WFO5001
-        Application.SetDefaultFont(new Font("Microsoft YaHei UI", 9F));
+        // 与系统输入法候选窗观感一致的字体字号，避免小字发虚
+        Application.SetDefaultFont(new Font("Microsoft YaHei UI", 10.5F));
         Application.Run(new TrayApplicationContext());
     }
 }

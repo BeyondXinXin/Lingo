@@ -59,10 +59,9 @@ internal sealed class SettingsForm : Form
         MaximizeBox = false;
         MinimizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(460, 560);
+        ClientSize = new Size(500, 620);
         BackColor = Theme.MainBg;
         ForeColor = Theme.Text;
-        Font = new Font("Microsoft YaHei UI", 9F);
 
         _hotkeyBox = CreateTextBox(settings.Hotkey);
         _hotkeyBox.ReadOnly = true;
@@ -427,7 +426,7 @@ internal sealed class SettingsForm : Form
             BackColor = Theme.StressBg,
             Visible = false,
         };
-        page.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 88F));
+        page.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96F));
         page.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         return page;
     }
@@ -443,7 +442,7 @@ internal sealed class SettingsForm : Form
             AutoSize = true,
             Anchor = AnchorStyles.Left,
             ForeColor = Theme.Text,
-            Margin = new Padding(0, 9, 6, 0),
+            Margin = new Padding(0, 11, 6, 0),
         };
         if (control.Anchor != AnchorStyles.Left)
         {
