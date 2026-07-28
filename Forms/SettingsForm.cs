@@ -59,7 +59,7 @@ internal sealed class SettingsForm : Form
         MaximizeBox = false;
         MinimizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(540, 680);
+        ClientSize = new Size(540, 730);
         BackColor = Theme.MainBg;
         ForeColor = Theme.Text;
 
@@ -189,7 +189,7 @@ internal sealed class SettingsForm : Form
         AddRow(customPage, "Endpoint", Rounded(_endpointBox));
         AddRow(customPage, "API 密钥", Rounded(_apiKeyBox));
         AddRow(customPage, "模型名称", Rounded(_modelBox));
-        AddRow(customPage, "Prompt", Rounded(_promptBox, height: 108));
+        AddRow(customPage, "Prompt", Rounded(_promptBox, height: 176));
         AddRow(customPage, string.Empty, CreateHint("{text} 为原文占位符；留空则恢复默认 Prompt"));
         AddRow(customPage, "超时（秒）", Rounded(_timeoutNumeric, width: 90));
 
