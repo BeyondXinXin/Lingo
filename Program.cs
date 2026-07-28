@@ -29,7 +29,7 @@ internal static class Program
         Application.SetColorMode(SystemColorMode.Dark);
 #pragma warning restore WFO5001
         // 与系统输入法候选窗观感一致的字体字号，避免小字发虚
-        Application.SetDefaultFont(new Font("Microsoft YaHei UI", 10.5F));
+        Application.SetDefaultFont(new Font("Microsoft YaHei UI", 12F));
         Application.Run(new TrayApplicationContext());
     }
 }

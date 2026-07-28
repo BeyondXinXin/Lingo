@@ -59,7 +59,7 @@ internal sealed class SettingsForm : Form
         MaximizeBox = false;
         MinimizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(500, 620);
+        ClientSize = new Size(540, 680);
         BackColor = Theme.MainBg;
         ForeColor = Theme.Text;
 
@@ -426,7 +426,7 @@ internal sealed class SettingsForm : Form
             BackColor = Theme.StressBg,
             Visible = false,
         };
-        page.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96F));
+        page.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110F));
         page.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         return page;
     }

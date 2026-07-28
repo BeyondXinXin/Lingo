@@ -29,7 +29,7 @@ internal sealed class ResultPanel : CardPanel
         _header = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 28,
+            Height = 32,
             BackColor = Theme.MainBg,
         };
 
@@ -138,7 +138,7 @@ internal sealed class ResultPanel : CardPanel
     private void LayoutScrollBar()
     {
         int top = Padding.Top + _header.Height + 2;
-        _scrollBar.SetBounds(Width - Padding.Right + 3, top, 6, Height - top - Padding.Bottom - 2);
+        _scrollBar.SetBounds(Width - Padding.Right + 1, top, 8, Height - top - Padding.Bottom - 2);
         UpdateScrollBar();
     }
 

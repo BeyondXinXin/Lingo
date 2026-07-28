@@ -72,7 +72,7 @@ internal sealed class TranslateForm : Form
             RowCount = 1,
         };
         _layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-        // 输入区保持紧凑固定高度，缩小窗口时优先压缩结果区，最小可只剩一行输入
+        // 初始高度，首次翻译后由 UpdateRowWeights 按内容比例接管
         _layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 76F));
         _layout.Controls.Add(_sourceCard, 0, 0);
         Controls.Add(_layout);
@@ -136,6 +136,8 @@ internal sealed class TranslateForm : Form
 
     private void OnSourceBoxTextChanged(object? sender, EventArgs e)
     {
+        // 无论手动还是程序赋值，输入栏高度都随内容重新分配
+        UpdateRowWeights();
         if (_suppressTextChanged)
         {
             return;
@@ -331,32 +333,44 @@ internal sealed class TranslateForm : Form
 
         _layout.ResumeLayout();
         UpdateMinimumSize(count);
+        UpdateRowWeights();
     }
 
-    // 各结果行高按内容所需高度的比例分配，内容少的面板不再占大块空白
+    // 输入栏与各结果栏的行高统一按内容所需高度的比例分配
     private void UpdateRowWeights()
     {
-        if (_panels.Count < 2)
+        if (_panels.Count == 0)
         {
             return;
         }
 
-        float[] weights = new float[_panels.Count];
-        float total = 0F;
+        float[] weights = new float[_panels.Count + 1];
+        // 保底权重，避免短内容面板被压到看不清
+        weights[0] = Math.Max(72, SourceDesiredHeight());
+        float total = weights[0];
         for (int i = 0; i < _panels.Count; i++)
         {
-            // 保底权重，避免短内容面板被压到看不清
-            weights[i] = Math.Max(96, _panels[i].DesiredHeight);
-            total += weights[i];
+            weights[i + 1] = Math.Max(104, _panels[i].DesiredHeight);
+            total += weights[i + 1];
         }
 
         _layout.SuspendLayout();
-        for (int i = 0; i < _panels.Count; i++)
+        for (int i = 0; i < weights.Length; i++)
         {
-            _layout.RowStyles[i + 1] = new RowStyle(SizeType.Percent, weights[i] / total * 100F);
+            _layout.RowStyles[i] = new RowStyle(SizeType.Percent, weights[i] / total * 100F);
         }
 
         _layout.ResumeLayout();
+    }
+
+    // 输入卡片完整展示当前文本所需的高度
+    private int SourceDesiredHeight()
+    {
+        string text = _sourceBox.Text.Length == 0 ? "A" : _sourceBox.Text;
+        int width = Math.Max(60, _sourceBox.ClientSize.Width);
+        int textHeight = TextRenderer.MeasureText(text, _sourceBox.Font,
+            new Size(width, int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl).Height;
+        return _sourceCard.Padding.Top + _sourceCard.Padding.Bottom + textHeight + 8;
     }
 
     // 最小尺寸随结果面板数量变化，保证每张卡片至少能显示两行内容

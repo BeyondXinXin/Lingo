@@ -69,8 +69,8 @@ internal sealed class RoundedInput : CardPanel
     public RoundedInput(Control inner)
     {
         CornerRadius = 6;
-        Padding = new Padding(9, 7, 9, 7);
-        Height = 36;
+        Padding = new Padding(9, 8, 9, 8);
+        Height = 42;
 
         switch (inner)
         {
@@ -162,7 +162,7 @@ internal sealed class DarkButton : Button
 // 无边框图标按钮：用 Material Symbols 字体绘制单个图标，悬停时显示圆角背景
 internal sealed class IconButton : Button
 {
-    private static readonly Font GlyphFont = IconFont.Create(11F);
+    private static readonly Font GlyphFont = IconFont.Create(12F);
 
     private readonly char _glyph;
     private bool _hovered;
@@ -175,7 +175,7 @@ internal sealed class IconButton : Button
                  ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
         FlatStyle = FlatStyle.Flat;
         FlatAppearance.BorderSize = 0;
-        Size = new Size(26, 24);
+        Size = new Size(28, 26);
         TabStop = false;
         Cursor = Cursors.Hand;
         AccessibleName = tooltip;
@@ -315,7 +315,7 @@ internal sealed class SlimScrollBar : Control
     {
         SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
                  ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-        Width = 6;
+        Width = 8;
         TabStop = false;
     }
 
@@ -357,7 +357,8 @@ internal sealed class SlimScrollBar : Control
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         using GraphicsPath path = Theme.RoundedRectangle(
             new Rectangle(thumb.X, thumb.Y, thumb.Width - 1, thumb.Height - 1), Width / 2);
-        using SolidBrush brush = new(_dragging || _hovered ? Theme.BorderStrong : Theme.Border);
+        // 提高亮度保证深色背景下可见
+        using SolidBrush brush = new(_dragging || _hovered ? Theme.BorderStrong : Color.FromArgb(122, 126, 131));
         e.Graphics.FillPath(brush, path);
     }
 
