@@ -35,7 +35,7 @@ internal sealed class TranslateForm : Form
         StartPosition = FormStartPosition.Manual;
         ShowInTaskbar = false;
         KeyPreview = true;
-        MinimumSize = new Size(320, 150);
+        MinimumSize = SizeFromClientSize(new Size(460, 200));
         BackColor = Theme.MainBg;
         ForeColor = Theme.Text;
 
@@ -326,5 +326,14 @@ internal sealed class TranslateForm : Form
         }
 
         _layout.ResumeLayout();
+        UpdateMinimumSize(count);
+    }
+
+    // 最小尺寸随结果面板数量变化，保证每张卡片至少能显示两行内容
+    private void UpdateMinimumSize(int panelCount)
+    {
+        int panels = Math.Max(1, panelCount);
+        int clientHeight = 24 + 76 + panels * 110;
+        MinimumSize = SizeFromClientSize(new Size(460, clientHeight));
     }
 }

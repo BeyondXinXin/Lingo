@@ -12,7 +12,8 @@ internal sealed class ResultPanel : CardPanel
     private readonly IconButton _speakResultButton;
     private readonly IconButton _copyButton;
     private readonly Panel _header;
-    private readonly RichTextBox _textBox;
+    private readonly ScrollFreeRichTextBox _textBox;
+    private readonly SlimScrollBar _scrollBar;
 
     private bool _hasResult;
 
@@ -49,16 +50,23 @@ internal sealed class ResultPanel : CardPanel
         _speakResultButton.Click += OnSpeakResultClicked;
         _copyButton.Click += OnCopyClicked;
 
-        // RichTextBox 的垂直滚动条仅在内容超出时出现
-        _textBox = new RichTextBox
+        // 隐藏原生滚动条，改用右侧的自绘细滚动条，仅内容超出时显示
+        _textBox = new ScrollFreeRichTextBox
         {
             Dock = DockStyle.Fill,
             ReadOnly = true,
-            ScrollBars = RichTextBoxScrollBars.Vertical,
             BorderStyle = BorderStyle.None,
             BackColor = Theme.MainBg,
             ForeColor = Theme.Text,
         };
+        _scrollBar = new SlimScrollBar
+        {
+            Visible = false,
+            BackColor = Theme.MainBg,
+        };
+        _textBox.Scrolled += (_, _) => UpdateScrollBar();
+        _textBox.ClientSizeChanged += (_, _) => UpdateScrollBar();
+        _scrollBar.ValueChanged += value => _textBox.ScrollTop = value;
 
         _header.Controls.Add(_titleLabel);
         _header.Controls.Add(_speakSourceButton);
@@ -66,9 +74,13 @@ internal sealed class ResultPanel : CardPanel
         _header.Controls.Add(_copyButton);
         Controls.Add(_textBox);
         Controls.Add(_header);
+        Controls.Add(_scrollBar);
+        _scrollBar.BringToFront();
 
         _header.Resize += (_, _) => LayoutHeader();
+        Resize += (_, _) => LayoutScrollBar();
         LayoutHeader();
+        LayoutScrollBar();
 
         HookHoverTracking(this);
     }
@@ -114,6 +126,40 @@ internal sealed class ResultPanel : CardPanel
     {
         _textBox.ForeColor = color;
         _textBox.Text = text;
+        _textBox.ScrollTop = 0;
+        UpdateScrollBar();
+    }
+
+    // 右侧细滚动条位于内边距空白带内，不与文本重叠
+    private void LayoutScrollBar()
+    {
+        int top = Padding.Top + _header.Height + 2;
+        _scrollBar.SetBounds(Width - Padding.Right + 3, top, 6, Height - top - Padding.Bottom - 2);
+        UpdateScrollBar();
+    }
+
+    private void UpdateScrollBar()
+    {
+        int view = _textBox.ClientSize.Height;
+        int content = ContentHeight();
+        bool overflow = content > view + 2 && view > 0;
+        _scrollBar.Visible = overflow;
+        if (overflow)
+        {
+            _scrollBar.SetMetrics(content, view, _textBox.ScrollTop);
+        }
+    }
+
+    private int ContentHeight()
+    {
+        if (_textBox.TextLength == 0)
+        {
+            return 0;
+        }
+
+        // 末字符的绝对 Y 坐标 + 行高 ≈ 内容总高度
+        int lastTop = _textBox.GetPositionFromCharIndex(_textBox.TextLength - 1).Y + _textBox.ScrollTop;
+        return lastTop + _textBox.Font.Height + 2;
     }
 
     private void OnCopyClicked(object? sender, EventArgs e)
