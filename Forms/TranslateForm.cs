@@ -16,6 +16,7 @@ internal sealed class TranslateForm : Form
     private readonly TableLayoutPanel _layout;
     private readonly List<ResultPanel> _panels = [];
     private readonly System.Windows.Forms.Timer _autoTranslateTimer;
+    private readonly System.Windows.Forms.Timer _memoryTrimTimer;
 
     private bool _suppressTextChanged;
     private string _lastTranslatedText = string.Empty;
@@ -87,10 +88,22 @@ internal sealed class TranslateForm : Form
             _autoTranslateTimer.Stop();
             StartTranslation(_sourceBox.Text.Trim(), _getSettings(), force: false);
         };
+
+        // 隐藏窗口后延迟整理内存；期间若又被唤出则跳过本次
+        _memoryTrimTimer = new System.Windows.Forms.Timer { Interval = 1200 };
+        _memoryTrimTimer.Tick += (_, _) =>
+        {
+            _memoryTrimTimer.Stop();
+            if (!Visible)
+            {
+                Task.Run(MemoryTrimmer.Trim);
+            }
+        };
     }
 
     public void ShowTranslation(string text)
     {
+        _memoryTrimTimer.Stop();
         AppSettings settings = _getSettings();
         if (!Visible)
         {
@@ -167,6 +180,9 @@ internal sealed class TranslateForm : Form
         _translationService.CancelActive();
         SaveWindowBounds();
         Hide();
+        // 等取消中的翻译任务收尾后把膨胀的内存还给系统，驻留占用回到基线
+        _memoryTrimTimer.Stop();
+        _memoryTrimTimer.Start();
     }
 
     private void SaveWindowBounds()

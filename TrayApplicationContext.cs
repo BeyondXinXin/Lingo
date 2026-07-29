@@ -31,6 +31,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
 
         AppLogger.Info($"Lingo 启动，快捷键 {_settings.Hotkey}");
+        // 启动收尾后整理一次，降低初始驻留占用
+        MemoryTrimmer.TrimLater(delayMilliseconds: 3000);
     }
 
     private void TranslateClipboard()
@@ -63,6 +65,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
         finally
         {
             _settingsForm = null;
+            // 设置窗口销毁后顺手把窗体相关内存还给系统
+            MemoryTrimmer.TrimLater();
         }
     }
 
