@@ -172,6 +172,8 @@ internal sealed class TranslateForm : Form
         SaveWindowBounds();
         // 仅隐藏不销毁，窗体与面板常驻后台，下次显示直接复用
         Hide();
+        // 归还显示期间触碰的闲置物理页，避免反复开关后驻留占用缓慢增长
+        MemoryTrimmer.ReleaseWorkingSet();
     }
 
     private void SaveWindowBounds()

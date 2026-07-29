@@ -17,6 +17,20 @@ internal static class MemoryTrimmer
         });
     }
 
+    // 隐藏窗口后把闲置物理内存页归还系统：不做 GC、不销毁对象，
+    // 页面进入备用列表，下次显示按需取回，弹出速度不受影响
+    public static void ReleaseWorkingSet()
+    {
+        try
+        {
+            SetProcessWorkingSetSize(GetCurrentProcess(), -1, -1);
+        }
+        catch
+        {
+            // 仅优化任务管理器里的占用数字，失败不影响功能
+        }
+    }
+
     private static void Trim()
     {
         try
