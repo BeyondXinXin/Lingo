@@ -1,79 +1,58 @@
 # Lingo
 
-轻量级 Windows 剪贴板翻译工具。托盘常驻，按下全局快捷键即可翻译剪贴板中的文本，支持百度翻译与任意 OpenAI 兼容 API，两个服务并发请求、互不阻塞。
+一款轻量的 Windows 划词翻译小工具：复制文本，按下快捷键，译文立刻弹出。
 
-- 技术栈：C# / .NET 10 / WinForms / Windows x64
-- 零轮询：空闲时不占 CPU，仅靠系统消息（RegisterHotKey）唤醒
-- 无第三方依赖，仅使用 .NET 自带能力
+支持百度翻译和任意 AI 大模型（OpenAI / DeepSeek / Ollama 等）同时翻译、对照查看，AI 译文逐字流式显示，不用干等。
 
 ## 界面预览
 
 ![Lingo 翻译窗口](docs/images/lingo-main.png)
 
-## 功能
+## 特点
 
-| 功能 | 说明 |
-| --- | --- |
-| 托盘常驻 | 无主窗口，托盘菜单：翻译剪贴板 / 设置 / 退出 |
-| 全局快捷键 | 默认 `Ctrl+Alt+T`，可在设置中修改；被占用时气泡提示，不影响运行 |
-| 翻译浮窗 | 深色主题、弹出时自动置顶一次、可拖动缩放（最小可缩到一行输入）、Esc 或关闭按钮隐藏（不退出）、记忆位置与大小、优先显示在鼠标所在屏幕；输入停顿自动翻译，Enter 立即翻译（Shift+Enter 换行）；结果栏悬停显示朗读/复制图标 |
-| 百度翻译 | 通用文本翻译 API，需自备 AppID / SecretKey；目标为中文且原文已是中文时自动改译英文 |
-| 模型翻译 | 任意 OpenAI Chat Completions 兼容服务（OpenAI / DeepSeek / Ollama 等），支持配置多个并发翻译，面板标题显示自定义名称或模型名；可自定义 Prompt（`{text}` 为原文占位符）与超时 |
-| 文本预处理 | 自动将连字符 / 下划线还原为空格、拆分驼峰命名，适合翻译代码标识符 |
-| 取消机制 | 连续触发翻译时自动取消上一轮未完成的请求 |
+- **一键翻译**：复制任意文本，按 `Ctrl+Alt+T`（可自定义）即弹出译文，也可以直接在窗口里输入
+- **多引擎对照**：百度翻译 + 多个 AI 模型并发翻译，结果并排展示，互不等待
+- **流式输出**：AI 译文像聊天一样逐字出现，第一时间看到结果
+- **中英互译**：中文自动译成英文，其他语言自动译成中文
+- **安静省心**：平时藏在托盘里不打扰，空闲时几乎不占资源；窗口可拖动、可缩放，位置大小都会记住
+- **贴心细节**：翻译结果一键复制、一键朗读；代码里的 `snake_case`、`camelCase` 会自动拆成正常单词再翻译
+- **绿色免安装**：单个 exe 文件，不写注册表垃圾，删掉即卸载
 
-## 运行
+## 下载安装
 
-环境要求：Windows x64（自包含发布无需安装 .NET 运行时）。
+前往 [Releases](https://github.com/BeyondXinXin/Lingo/releases/latest) 下载最新版本，解压后运行 `Lingo.exe` 即可。
 
-下载：[Releases](https://github.com/BeyondXinXin/Lingo/releases) 页提供两种压缩包，下载解压其一即可：
+- **完整独立版（self-contained，推荐）**：解压后直接运行，无需安装任何东西
+- **精简版（framework-dependent）**：体积更小，需先安装 [.NET 10 桌面运行时](https://aka.ms/dotnet/10.0/windowsdesktop-runtime-win-x64.exe)
 
-- **完整独立版（self-contained，推荐）**：已包含 .NET 运行时，解压后直接运行
-- **精简版（framework-dependent）**：体积小，需先安装 [.NET 10 Desktop Runtime x64](https://aka.ms/dotnet/10.0/windowsdesktop-runtime-win-x64.exe)
+系统要求：Windows 10/11 x64。
 
-开发运行：
+## 快速上手
 
-```powershell
-dotnet run --project Lingo.csproj
-```
+1. 运行 `Lingo.exe`，程序会驻留在托盘（屏幕右下角小图标）
+2. 右键托盘图标 → **设置**，填好翻译服务（任选其一即可）：
+   - **百度翻译**：免费额度足够日常使用，[点此申请](https://fanyi-api.baidu.com/) App ID 和密钥
+   - **模型翻译**：填入任意 OpenAI 兼容服务的地址、密钥和模型名，可以添加多个
+3. 复制一段文字，按 `Ctrl+Alt+T`，完成！
 
-启动后程序驻留托盘（不显示窗口）。复制任意文本，按 `Ctrl+Alt+T` 即弹出翻译窗口。
+小技巧：
 
-## 配置
+- 在翻译窗口里直接改字，停顿片刻自动重新翻译；`Enter` 立即翻译，`Shift+Enter` 换行
+- `Esc` 隐藏窗口（程序继续留在托盘）
+- 鼠标悬停在译文上，右上角会出现朗读和复制按钮
+- 设置里可以开启开机自启
 
-首次使用请右键托盘图标 → 设置（标签页式深色界面）：
+## 常见问题
 
-- **常规**：全局快捷键、目标语言、开机自启
-- **百度翻译**：启用开关、App ID、Secret Key（申请地址：https://fanyi-api.baidu.com/ ）、源/目标语言
-- **模型翻译**：支持添加多个模型配置，每个配置含启用开关、显示名称、Endpoint（形如 `https://api.openai.com/v1/chat/completions`）、API 密钥、模型名、Prompt、超时秒数
+**快捷键按了没反应？**
+可能被其他软件占用了，去设置里换一个组合键。
 
-配置保存在 `%LocalAppData%\BeyondXinXin\Lingo\settings.json`；文件损坏时会自动备份为 `settings.corrupted.json` 并恢复默认。日志位于同目录 `lingo.log`（不记录任何密钥）。
+**配置存在哪里？**
+`%LocalAppData%\BeyondXinXin\Lingo\settings.json`，日志在同目录（不会记录任何密钥）。
 
-## 发布
+**想彻底删除？**
+删掉 `Lingo.exe` 和上面那个配置文件夹即可。
 
-```powershell
-powershell -ExecutionPolicy Bypass -File publish.ps1
-```
+## 开发
 
-或手动执行：
-
-```powershell
-dotnet publish Lingo.csproj -c Release /p:PublishProfile=SelfContained
-```
-
-产物为单文件 `artifacts\self-contained\Lingo.exe`（Release / win-x64 / 自包含 / 压缩单文件），拷贝到任意机器即可运行。
-
-## 项目结构
-
-```
-Lingo/
-├── Forms/            # TranslateForm 翻译浮窗、SettingsForm 设置、ResultPanel 结果面板
-├── Services/         # ITranslator、BaiduTranslator、CustomApiTranslator、
-│                     # TranslationService（并发调度）、HotkeyService、
-│                     # ClipboardService、TrayService、StartupService
-├── Models/           # AppSettings、TranslationResult
-├── Infrastructure/   # SettingsStore、AppLogger、AppIcon
-├── Assets/           # 图标
-├── Program.cs        # 单实例 + 全局异常处理入口
-└── TrayApplicationContext.cs  # 托盘常驻上下文，组装各服务
-```
+C# / .NET 10 / WinForms，无第三方依赖。克隆后 `dotnet run --project Lingo.csproj` 即可运行，`publish.ps1` 一键发布。
