@@ -9,12 +9,20 @@ internal static class SettingsStore
 
     public static string SettingsDirectory => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "BeyondXinXin",
+        "Lingo");
+
+    // 旧版配置目录（无厂商层），仅用于一次性搬迁
+    private static string LegacySettingsDirectory => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Lingo");
 
     private static string SettingsPath => Path.Combine(SettingsDirectory, "settings.json");
 
     public static AppSettings Load()
     {
+        MigrateLegacyDirectory();
+
         try
         {
             if (!File.Exists(SettingsPath))
@@ -69,6 +77,41 @@ internal static class SettingsStore
         }
 
         return settings;
+    }
+
+    // 旧版目录 %LocalAppData%\Lingo 一次性搬迁到 BeyondXinXin\Lingo，与其他项目的厂商目录对齐
+    private static void MigrateLegacyDirectory()
+    {
+        try
+        {
+            if (!Directory.Exists(LegacySettingsDirectory))
+            {
+                return;
+            }
+
+            if (!Directory.Exists(SettingsDirectory))
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(SettingsDirectory)!);
+                Directory.Move(LegacySettingsDirectory, SettingsDirectory);
+                return;
+            }
+
+            // 新目录已被提前创建（如日志）时逐个搬文件，已存在的不覆盖
+            foreach (string file in Directory.GetFiles(LegacySettingsDirectory))
+            {
+                string target = Path.Combine(SettingsDirectory, Path.GetFileName(file));
+                if (!File.Exists(target))
+                {
+                    File.Move(file, target);
+                }
+            }
+
+            Directory.Delete(LegacySettingsDirectory, recursive: true);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Error("旧配置目录迁移失败", ex);
+        }
     }
 
     private static void BackupCorruptedFile()

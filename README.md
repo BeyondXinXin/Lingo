@@ -47,7 +47,7 @@ dotnet run --project Lingo.csproj
 - **百度翻译**：启用开关、App ID、Secret Key（申请地址：https://fanyi-api.baidu.com/ ）、源/目标语言
 - **模型翻译**：支持添加多个模型配置，每个配置含启用开关、显示名称、Endpoint（形如 `https://api.openai.com/v1/chat/completions`）、API 密钥、模型名、Prompt、超时秒数
 
-配置保存在 `%LocalAppData%\Lingo\settings.json`；文件损坏时会自动备份为 `settings.corrupted.json` 并恢复默认。日志位于同目录 `lingo.log`（不记录任何密钥）。
+配置保存在 `%LocalAppData%\BeyondXinXin\Lingo\settings.json`；文件损坏时会自动备份为 `settings.corrupted.json` 并恢复默认。日志位于同目录 `lingo.log`（不记录任何密钥）。
 
 ## 发布
 
