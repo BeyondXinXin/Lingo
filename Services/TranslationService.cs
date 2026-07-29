@@ -30,8 +30,12 @@ internal sealed class TranslationService : IDisposable
         return translators;
     }
 
-    // onResult 在线程池线程上回调，带回发起的翻译器实例供 UI 层定位面板；UI 层需自行切回 UI 线程
-    public void StartTranslation(string text, IReadOnlyList<ITranslator> translators, Action<ITranslator, TranslationResult> onResult)
+    // onPartial/onResult 在线程池线程上回调，带回发起的翻译器实例供 UI 层定位面板；UI 层需自行切回 UI 线程
+    public void StartTranslation(
+        string text,
+        IReadOnlyList<ITranslator> translators,
+        Action<ITranslator, string> onPartial,
+        Action<ITranslator, TranslationResult> onResult)
     {
         CancelActive();
 
@@ -39,7 +43,7 @@ internal sealed class TranslationService : IDisposable
         _activeCts = cts;
         foreach (ITranslator translator in translators)
         {
-            _ = RunOneAsync(translator, text, cts.Token, onResult);
+            _ = RunOneAsync(translator, text, cts.Token, onPartial, onResult);
         }
     }
 
@@ -60,12 +64,22 @@ internal sealed class TranslationService : IDisposable
         ITranslator translator,
         string text,
         CancellationToken cancellationToken,
+        Action<ITranslator, string> onPartial,
         Action<ITranslator, TranslationResult> onResult)
     {
         TranslationResult result;
         try
         {
-            result = await translator.TranslateAsync(text, cancellationToken).ConfigureAwait(false);
+            result = await translator.TranslateAsync(
+                text,
+                partial =>
+                {
+                    if (!cancellationToken.IsCancellationRequested)
+                    {
+                        onPartial(translator, partial);
+                    }
+                },
+                cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {

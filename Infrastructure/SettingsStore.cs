@@ -59,6 +59,15 @@ internal static class SettingsStore
             settings.CustomApi = null;
         }
 
+        // 旧版默认 Prompt 自动迁移到新的精简 System Prompt（用户自定义的保留不动）
+        foreach (CustomApiSettings api in settings.CustomApis)
+        {
+            if (string.Equals(api.Prompt?.Trim(), CustomApiSettings.LegacyDefaultPrompt, StringComparison.Ordinal))
+            {
+                api.Prompt = CustomApiSettings.DefaultPrompt;
+            }
+        }
+
         return settings;
     }
 

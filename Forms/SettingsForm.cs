@@ -190,7 +190,7 @@ internal sealed class SettingsForm : Form
         AddRow(customPage, "API 密钥", Rounded(_apiKeyBox));
         AddRow(customPage, "模型名称", Rounded(_modelBox));
         AddRow(customPage, "Prompt", Rounded(_promptBox, height: 176));
-        AddRow(customPage, string.Empty, CreateHint("{text} 为原文占位符；留空则恢复默认 Prompt"));
+        AddRow(customPage, string.Empty, CreateHint("作为 System 消息固定发送，每次只传原文；留空则恢复默认 Prompt"));
         AddRow(customPage, "超时（秒）", Rounded(_timeoutNumeric, width: 90));
 
         card.Controls.Add(generalPage);

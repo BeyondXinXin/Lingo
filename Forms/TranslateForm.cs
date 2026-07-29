@@ -264,29 +264,54 @@ internal sealed class TranslateForm : Form
             _panels[i].ShowLoading();
         }
 
-        _translationService.StartTranslation(text, translators, (translator, result) =>
-        {
-            if (IsDisposed)
+        _translationService.StartTranslation(text, translators,
+            onPartial: (translator, partial) =>
             {
-                return;
-            }
-
-            try
-            {
-                BeginInvoke(() =>
+                if (IsDisposed)
                 {
-                    if (panelMap.TryGetValue(translator, out ResultPanel? panel) && !panel.IsDisposed)
+                    return;
+                }
+
+                try
+                {
+                    // 流式 token 到达即刷新面板，行高随内容增长实时重分配
+                    BeginInvoke(() =>
                     {
-                        panel.ShowResult(result);
-                        UpdateRowWeights();
-                    }
-                });
-            }
-            catch (InvalidOperationException)
+                        if (panelMap.TryGetValue(translator, out ResultPanel? panel) && !panel.IsDisposed)
+                        {
+                            panel.ShowStreaming(partial);
+                            UpdateRowWeights();
+                        }
+                    });
+                }
+                catch (InvalidOperationException)
+                {
+                    // 窗口句柄在回调前被销毁（程序退出），直接丢弃
+                }
+            },
+            onResult: (translator, result) =>
             {
-                // 窗口句柄在回调前被销毁（程序退出），直接丢弃结果
-            }
-        });
+                if (IsDisposed)
+                {
+                    return;
+                }
+
+                try
+                {
+                    BeginInvoke(() =>
+                    {
+                        if (panelMap.TryGetValue(translator, out ResultPanel? panel) && !panel.IsDisposed)
+                        {
+                            panel.ShowResult(result);
+                            UpdateRowWeights();
+                        }
+                    });
+                }
+                catch (InvalidOperationException)
+                {
+                    // 窗口句柄在回调前被销毁（程序退出），直接丢弃结果
+                }
+            });
     }
 
     // 按启用的翻译服务数量增删结果面板并重排行高

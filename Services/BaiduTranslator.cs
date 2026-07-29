@@ -25,7 +25,8 @@ internal sealed class BaiduTranslator : ITranslator
 
     public string Name => "百度翻译";
 
-    public async Task<TranslationResult> TranslateAsync(string text, CancellationToken cancellationToken)
+    // 百度接口不支持流式，onPartial 忽略
+    public async Task<TranslationResult> TranslateAsync(string text, Action<string>? onPartial, CancellationToken cancellationToken)
     {
         Stopwatch stopwatch = Stopwatch.StartNew();
         if (string.IsNullOrWhiteSpace(_settings.AppId) || string.IsNullOrWhiteSpace(_settings.SecretKey))

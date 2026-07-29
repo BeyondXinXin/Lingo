@@ -29,8 +29,12 @@ internal sealed class BaiduSettings
 
 internal sealed class CustomApiSettings
 {
-    // {text} 为原文占位符；不含占位符时 Prompt 作为 system 消息、原文作为 user 消息发送
+    // 作为 System 消息固定发送，User 消息只传待翻译文本；含 {text} 占位符时回退为旧版单 user 消息模板
     public static readonly string DefaultPrompt =
+        "你是翻译引擎。\n中文翻译成英文，其他语言翻译成简体中文。\n保持格式，只输出译文。";
+
+    // 旧版默认 Prompt，仅用于加载时识别并迁移到新默认值
+    public static readonly string LegacyDefaultPrompt =
         "你是一个严格遵循规则的机器翻译官，仅执行精准的跨语言转换。" +
         "规则：1.当输入为中文时，翻译为英文；2.当输入为非中文时，翻译为简体中文；" +
         "3.保持原始格式结构，仅替换语言文字部分。" +

@@ -16,6 +16,7 @@ internal sealed class ResultPanel : CardPanel
     private readonly SlimScrollBar _scrollBar;
 
     private bool _hasResult;
+    private string? _streamText;
 
     public ResultPanel(string title)
     {
@@ -99,6 +100,7 @@ internal sealed class ResultPanel : CardPanel
     public void ShowLoading()
     {
         _hasResult = false;
+        _streamText = null;
         SetText("翻译中…", Theme.TextMuted);
         UpdateButtonVisibility();
     }
@@ -106,8 +108,30 @@ internal sealed class ResultPanel : CardPanel
     public void ShowIdle(string message)
     {
         _hasResult = false;
+        _streamText = null;
         SetText(message, Theme.TextMuted);
         UpdateButtonVisibility();
+    }
+
+    // 流式输出途中的增量刷新：partial 为已累积的完整译文，尽量只追加后缀避免整段重设闪烁
+    public void ShowStreaming(string partial)
+    {
+        if (partial.Length == 0)
+        {
+            return;
+        }
+
+        if (_streamText is not null && partial.StartsWith(_streamText, StringComparison.Ordinal))
+        {
+            _textBox.AppendText(partial[_streamText.Length..]);
+            UpdateScrollBar();
+        }
+        else
+        {
+            SetText(partial, Theme.Text);
+        }
+
+        _streamText = partial;
     }
 
     public void ShowResult(TranslationResult result)
@@ -115,7 +139,11 @@ internal sealed class ResultPanel : CardPanel
         if (result.Success)
         {
             _hasResult = result.Text.Length > 0;
-            SetText(result.Text, Theme.Text);
+            // 流式已把全文显示完整时不再重设，避免收尾时跳动
+            if (_streamText is null || !string.Equals(_streamText.Trim(), result.Text, StringComparison.Ordinal))
+            {
+                SetText(result.Text, Theme.Text);
+            }
         }
         else
         {
@@ -123,6 +151,7 @@ internal sealed class ResultPanel : CardPanel
             SetText(result.ErrorMessage, Theme.Danger);
         }
 
+        _streamText = null;
         UpdateButtonVisibility();
     }
 
