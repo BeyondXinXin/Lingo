@@ -6,6 +6,10 @@
 - 零轮询：空闲时不占 CPU，仅靠系统消息（RegisterHotKey）唤醒
 - 无第三方依赖，仅使用 .NET 自带能力
 
+## 界面预览
+
+![Lingo 翻译窗口](docs/images/lingo-main.png)
+
 ## 功能
 
 | 功能 | 说明 |
@@ -21,6 +25,11 @@
 ## 运行
 
 环境要求：Windows x64（自包含发布无需安装 .NET 运行时）。
+
+下载：[Releases](https://github.com/BeyondXinXin/Lingo/releases) 页提供两种压缩包，下载解压其一即可：
+
+- **完整独立版（self-contained，推荐）**：已包含 .NET 运行时，解压后直接运行
+- **精简版（framework-dependent）**：体积小，需先安装 [.NET 10 Desktop Runtime x64](https://aka.ms/dotnet/10.0/windowsdesktop-runtime-win-x64.exe)
 
 开发运行：
 
