@@ -165,6 +165,7 @@ internal sealed class SettingsForm : Form
         AddRow(generalPage, string.Empty, CreateHint("点击输入框后按下组合键，例如 Ctrl+Alt+T"));
         AddRow(generalPage, "目标语言", _targetCombo);
         AddRow(generalPage, string.Empty, _startupCheck);
+        AddRow(generalPage, "版本", CreateHint("v" + ProductVersionText()));
 
         TableLayoutPanel baiduPage = CreatePage();
         AddRow(baiduPage, string.Empty, _baiduEnabledCheck);
@@ -209,6 +210,14 @@ internal sealed class SettingsForm : Form
         SelectTab(0);
         AcceptButton = saveButton;
         CancelButton = cancelButton;
+    }
+
+    // 程序集版本号，去掉内嵌的 +commit 后缀
+    private static string ProductVersionText()
+    {
+        string version = Application.ProductVersion;
+        int plus = version.IndexOf('+');
+        return plus >= 0 ? version[..plus] : version;
     }
 
     private void AddTab(FlowLayoutPanel tabBar, string title, Control page)
