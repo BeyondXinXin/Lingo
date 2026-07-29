@@ -93,6 +93,10 @@ internal sealed class ResultPanel : CardPanel
         set => _titleLabel.Text = value;
     }
 
+    // 由父窗口注入，供“朗读原文”取当前输入框文本
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public Func<string>? SourceTextProvider { get; set; }
+
     // 完整展示当前内容所需的高度，供父容器按内容比例分配行高
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public int DesiredHeight => Padding.Top + _header.Height + ContentHeight() + Padding.Bottom + 6;
@@ -203,13 +207,21 @@ internal sealed class ResultPanel : CardPanel
         }
     }
 
-    // 朗读功能暂未实现，先占位图标
     private void OnSpeakSourceClicked(object? sender, EventArgs e)
     {
+        string? text = SourceTextProvider?.Invoke();
+        if (!string.IsNullOrWhiteSpace(text))
+        {
+            TtsService.Toggle(text);
+        }
     }
 
     private void OnSpeakResultClicked(object? sender, EventArgs e)
     {
+        if (_hasResult)
+        {
+            TtsService.Toggle(_textBox.Text);
+        }
     }
 
     private void LayoutHeader()

@@ -178,6 +178,7 @@ internal sealed class TranslateForm : Form
     {
         _autoTranslateTimer.Stop();
         _translationService.CancelActive();
+        TtsService.Stop();
         SaveWindowBounds();
         Hide();
         // 等取消中的翻译任务收尾后把膨胀的内存还给系统，驻留占用回到基线
@@ -349,7 +350,10 @@ internal sealed class TranslateForm : Form
 
         while (_panels.Count < count)
         {
-            ResultPanel panel = new(string.Empty);
+            ResultPanel panel = new(string.Empty)
+            {
+                SourceTextProvider = () => _sourceBox.Text,
+            };
             _panels.Add(panel);
             _layout.Controls.Add(panel, 0, _panels.Count);
         }
