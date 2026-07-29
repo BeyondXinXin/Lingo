@@ -3,26 +3,21 @@ using System.Runtime.InteropServices;
 
 namespace Lingo.Infrastructure;
 
-// 托盘常驻工具的内存整理：窗口隐藏后做一次完整压缩 GC 并裁剪工作集，
-// 把翻译过程中膨胀的托管堆与缓存还给系统，驻留占用回到基线
+// 仅在启动收尾时使用的一次性内存整理：把单文件解压与 JIT 产生的启动垃圾还给系统。
+// 运行期间不再整理，窗体与面板常驻复用，内存保持稳定
 internal static class MemoryTrimmer
 {
-    // 延迟触发：等取消中的翻译任务与 UI 回调收尾后再整理；shouldSkip 返回 true（如窗口又被唤出）则放弃本次
-    public static void TrimLater(int delayMilliseconds = 1000, Func<bool>? shouldSkip = null)
+    // 延迟触发：等启动初始化与预建控件收尾后再整理
+    public static void TrimLater(int delayMilliseconds)
     {
         _ = Task.Run(async () =>
         {
             await Task.Delay(delayMilliseconds).ConfigureAwait(false);
-            if (shouldSkip?.Invoke() == true)
-            {
-                return;
-            }
-
             Trim();
         });
     }
 
-    public static void Trim()
+    private static void Trim()
     {
         try
         {
