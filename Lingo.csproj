@@ -16,7 +16,7 @@
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <AssemblyName>Lingo</AssemblyName>
     <RootNamespace>Lingo</RootNamespace>
-    <Version>0.2.1</Version>
+    <Version>0.2.2</Version>
     <Product>Lingo</Product>
     <AssemblyTitle>Lingo</AssemblyTitle>
     <Description>轻量级 Windows 剪贴板翻译工具</Description>
