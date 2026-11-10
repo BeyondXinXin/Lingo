@@ -4,7 +4,7 @@ using System.ComponentModel;
 
 namespace Lingo.Forms;
 
-// 翻译窗口中单个翻译服务的结果卡片：AIxyz 风格圆角亮边框，图标按钮仅在鼠标移入时显示
+// 单个翻译服务的结果卡片，操作按钮在鼠标移入时显示
 internal sealed class ResultPanel : CardPanel
 {
     private readonly Label _titleLabel;
@@ -15,33 +15,18 @@ internal sealed class ResultPanel : CardPanel
     private readonly ScrollFreeRichTextBox _textBox;
     private readonly SlimScrollBar _scrollBar;
 
+    private int _layoutDpi;
     private bool _hasResult;
     private string? _streamText;
 
     public ResultPanel(string title)
     {
         Dock = DockStyle.Fill;
-        Padding = new Padding(12, 6, 12, 8);
-        CornerRadius = 10;
-        BorderWidth = 2F;
-        BorderColor = Theme.BorderStrong;
-        BackColor = Theme.MainBg;
+        BorderColor = Theme.PaneBorder;
 
-        _header = new Panel
-        {
-            Dock = DockStyle.Top,
-            Height = 32,
-            BackColor = Theme.MainBg,
-        };
-
-        _titleLabel = new Label
-        {
-            Text = title,
-            AutoSize = true,
-            Location = new Point(0, 4),
-            ForeColor = Theme.TextMuted,
-            BackColor = Theme.MainBg,
-        };
+        _header = new Panel { Dock = DockStyle.Top };
+        _titleLabel = Theme.CreatePaneTitle(title);
+        _titleLabel.Dock = DockStyle.None;
 
         // 图标与 AIxyz 翻译助手一致：朗读原文、朗读翻译结果、复制翻译结果
         _speakSourceButton = new IconButton(IconFont.MediaOutput, "朗读原文") { Visible = false };
@@ -57,13 +42,13 @@ internal sealed class ResultPanel : CardPanel
             Dock = DockStyle.Fill,
             ReadOnly = true,
             BorderStyle = BorderStyle.None,
-            BackColor = Theme.MainBg,
+            BackColor = Theme.StressBg,
             ForeColor = Theme.Text,
         };
         _scrollBar = new SlimScrollBar
         {
             Visible = false,
-            BackColor = Theme.MainBg,
+            BackColor = Theme.StressBg,
         };
         _textBox.Scrolled += (_, _) => UpdateScrollBar();
         _textBox.ClientSizeChanged += (_, _) => UpdateScrollBar();
@@ -80,9 +65,6 @@ internal sealed class ResultPanel : CardPanel
 
         _header.Resize += (_, _) => LayoutHeader();
         Resize += (_, _) => LayoutScrollBar();
-        LayoutHeader();
-        LayoutScrollBar();
-
         HookHoverTracking(this);
     }
 
@@ -97,9 +79,24 @@ internal sealed class ResultPanel : CardPanel
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public Func<string>? SourceTextProvider { get; set; }
 
-    // 完整展示当前内容所需的高度，供父容器按内容比例分配行高
-    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-    public int DesiredHeight => Padding.Top + _header.Height + ContentHeight() + Padding.Bottom + 6;
+    public void UpdateMetrics(int dpi)
+    {
+        _layoutDpi = dpi;
+        int horizontal = ScaleMetric(12);
+        int vertical = ScaleMetric(8);
+        SuspendLayout();
+        Padding = new Padding(horizontal, vertical, horizontal, vertical);
+        _header.Height = Math.Max(_titleLabel.PreferredHeight, ScaleMetric(26));
+        Size buttonSize = new(ScaleMetric(26), ScaleMetric(24));
+        _speakSourceButton.Size = buttonSize;
+        _speakResultButton.Size = buttonSize;
+        _copyButton.Size = buttonSize;
+        ResumeLayout();
+        LayoutHeader();
+        LayoutScrollBar();
+    }
+
+    private int ScaleMetric(int value) => (int)Math.Round(value * (_layoutDpi > 0 ? _layoutDpi : DeviceDpi) / 96F);
 
     public void ShowLoading()
     {
@@ -170,8 +167,10 @@ internal sealed class ResultPanel : CardPanel
     // 右侧细滚动条位于内边距空白带内，不与文本重叠
     private void LayoutScrollBar()
     {
-        int top = Padding.Top + _header.Height + 2;
-        _scrollBar.SetBounds(Width - Padding.Right + 1, top, 8, Height - top - Padding.Bottom - 2);
+        int inset = ScaleMetric(2);
+        int top = Padding.Top + _header.Height + inset;
+        _scrollBar.SetBounds(Width - Padding.Right + inset, top,
+            ScaleMetric(6), Math.Max(0, Height - top - Padding.Bottom - inset));
         UpdateScrollBar();
     }
 
@@ -196,7 +195,7 @@ internal sealed class ResultPanel : CardPanel
 
         // 末字符的绝对 Y 坐标 + 行高 ≈ 内容总高度
         int lastTop = _textBox.GetPositionFromCharIndex(_textBox.TextLength - 1).Y + _textBox.ScrollTop;
-        return lastTop + _textBox.Font.Height + 2;
+        return lastTop + (int)Math.Ceiling(_textBox.Font.GetHeight(DeviceDpi)) + ScaleMetric(2);
     }
 
     private void OnCopyClicked(object? sender, EventArgs e)
@@ -227,11 +226,17 @@ internal sealed class ResultPanel : CardPanel
     private void LayoutHeader()
     {
         int right = _header.Width;
+        int gap = ScaleMetric(2);
         foreach (IconButton button in new[] { _copyButton, _speakResultButton, _speakSourceButton })
         {
-            right -= button.Width + 2;
-            button.Location = new Point(right, 2);
+            if (button.Visible)
+            {
+                right -= button.Width + gap;
+                button.Location = new Point(right, (_header.Height - button.Height) / 2);
+            }
         }
+
+        _titleLabel.SetBounds(0, 0, Math.Max(0, right), _header.Height);
     }
 
     // 鼠标移入卡片任意区域时显示图标按钮，完全移出后隐藏
@@ -251,9 +256,6 @@ internal sealed class ResultPanel : CardPanel
         _speakSourceButton.Visible = hovered;
         _speakResultButton.Visible = hovered;
         _copyButton.Visible = hovered && _hasResult;
-        if (hovered)
-        {
-            LayoutHeader();
-        }
+        LayoutHeader();
     }
 }

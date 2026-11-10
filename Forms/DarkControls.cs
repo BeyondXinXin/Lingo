@@ -19,7 +19,6 @@ internal class CardPanel : Panel
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public int CornerRadius { get; set; } = 8;
 
-    // AIxyz 翻译编辑框为 2px 轮廓，默认 1px 用于设置页等普通卡片
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public float BorderWidth { get; set; } = 1F;
 
@@ -41,7 +40,7 @@ internal class CardPanel : Panel
         e.Graphics.FillRectangle(parentBrush, ClientRectangle);
 
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        using GraphicsPath path = Theme.RoundedRectangle(BorderBounds(), CornerRadius);
+        using GraphicsPath path = Theme.RoundedRectangle(BorderBounds(), LogicalToDeviceUnits(CornerRadius));
         using SolidBrush background = new(BackColor);
         e.Graphics.FillPath(background, path);
     }
@@ -49,8 +48,8 @@ internal class CardPanel : Panel
     protected override void OnPaint(PaintEventArgs e)
     {
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        using GraphicsPath path = Theme.RoundedRectangle(BorderBounds(), CornerRadius);
-        using Pen pen = new(_borderColor, BorderWidth);
+        using GraphicsPath path = Theme.RoundedRectangle(BorderBounds(), LogicalToDeviceUnits(CornerRadius));
+        using Pen pen = new(_borderColor, BorderWidth * DeviceDpi / 96F);
         e.Graphics.DrawPath(pen, path);
         base.OnPaint(e);
     }
@@ -58,7 +57,7 @@ internal class CardPanel : Panel
     // 粗边框需向内收缩，避免描边被控件边缘裁剪
     private Rectangle BorderBounds()
     {
-        int inset = (int)Math.Floor(BorderWidth / 2F);
+        int inset = (int)Math.Floor(BorderWidth * DeviceDpi / 192F);
         return new Rectangle(inset, inset, Width - inset * 2 - 1, Height - inset * 2 - 1);
     }
 }
@@ -220,7 +219,7 @@ internal sealed class IconButton : Button
         g.SmoothingMode = SmoothingMode.AntiAlias;
         if (_hovered || _pressed)
         {
-            using GraphicsPath path = Theme.RoundedRectangle(new Rectangle(0, 0, Width - 1, Height - 1), 5);
+            using GraphicsPath path = Theme.RoundedRectangle(new Rectangle(0, 0, Width - 1, Height - 1), LogicalToDeviceUnits(5));
             using SolidBrush hoverBrush = new(_pressed ? Theme.PressedBg : Theme.HoverBg);
             g.FillPath(hoverBrush, path);
         }
@@ -340,7 +339,7 @@ internal sealed class SlimScrollBar : Control
                 return Rectangle.Empty;
             }
 
-            int thumbHeight = Math.Clamp((int)((float)_view / _content * Height), Math.Min(24, Height), Height);
+            int thumbHeight = Math.Clamp((int)((float)_view / _content * Height), Math.Min(LogicalToDeviceUnits(24), Height), Height);
             int y = (int)((float)_value / MaxValue * (Height - thumbHeight));
             return new Rectangle(0, y, Width, thumbHeight);
         }

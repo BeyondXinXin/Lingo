@@ -57,6 +57,7 @@ internal sealed class WindowBounds
     public int Y { get; set; }
     public int Width { get; set; }
     public int Height { get; set; }
+    public int Dpi { get; set; }
 
     public bool IsEmpty => Width <= 0 || Height <= 0;
 }

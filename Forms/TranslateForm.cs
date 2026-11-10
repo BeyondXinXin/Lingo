@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Lingo.Infrastructure;
 using Lingo.Models;
 using Lingo.Services;
@@ -7,13 +8,17 @@ namespace Lingo.Forms;
 // 常驻复用的翻译浮窗：Esc 隐藏、关闭即隐藏、优先显示在鼠标所在屏幕
 internal sealed class TranslateForm : Form
 {
+    private const int VerticalScrollBar = 1;
+
     private readonly Func<AppSettings> _getSettings;
     private readonly Action _persistSettings;
     private readonly TranslationService _translationService;
 
     private readonly TextBox _sourceBox;
     private readonly CardPanel _sourceCard;
-    private readonly TableLayoutPanel _layout;
+    private readonly Label _sourceTitle;
+    private readonly Panel _resultsHost;
+    private readonly TableLayoutPanel _resultsLayout;
     private readonly List<ResultPanel> _panels = [];
     private readonly System.Windows.Forms.Timer _autoTranslateTimer;
 
@@ -26,6 +31,10 @@ internal sealed class TranslateForm : Form
         _persistSettings = persistSettings;
         _translationService = translationService;
 
+        SuspendLayout();
+        AutoScaleDimensions = new SizeF(96F, 96F);
+        AutoScaleMode = AutoScaleMode.Dpi;
+        Font = Theme.TranslationFont;
         Text = "Lingo";
         Icon = AppIcon.Get();
         // Sizable 才会在标题栏显示窗口图标，禁用最大化/最小化保持精简
@@ -35,7 +44,6 @@ internal sealed class TranslateForm : Form
         StartPosition = FormStartPosition.Manual;
         ShowInTaskbar = false;
         KeyPreview = true;
-        MinimumSize = SizeFromClientSize(new Size(460, 200));
         BackColor = Theme.MainBg;
         ForeColor = Theme.Text;
 
@@ -44,41 +52,31 @@ internal sealed class TranslateForm : Form
             Dock = DockStyle.Fill,
             Multiline = true,
             BorderStyle = BorderStyle.None,
-            BackColor = Theme.MainBg,
+            BackColor = Theme.StressBg,
             ForeColor = Theme.Text,
+            ScrollBars = ScrollBars.Vertical,
+            AccessibleName = "原文",
             PlaceholderText = "输入需要翻译的文本，停顿或按 Enter 翻译",
             Margin = new Padding(0),
         };
         _sourceBox.KeyDown += OnSourceBoxKeyDown;
         _sourceBox.TextChanged += OnSourceBoxTextChanged;
+        _sourceTitle = Theme.CreatePaneTitle("原文");
         _sourceCard = new CardPanel
         {
-            Dock = DockStyle.Fill,
-            CornerRadius = 10,
-            BorderWidth = 2F,
-            BorderColor = Theme.BorderStrong,
-            BackColor = Theme.MainBg,
-            Padding = new Padding(12, 10, 12, 10),
-            Margin = new Padding(0, 0, 0, 10),
+            BorderColor = Theme.PaneBorder,
         };
         _sourceCard.Controls.Add(_sourceBox);
+        _sourceCard.Controls.Add(_sourceTitle);
+        _sourceBox.GotFocus += (_, _) => _sourceCard.BorderColor = Theme.BorderFocus;
+        _sourceBox.LostFocus += (_, _) => _sourceCard.BorderColor = Theme.PaneBorder;
 
-        _layout = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            Padding = new Padding(12),
-            BackColor = Theme.MainBg,
-            ColumnCount = 1,
-            RowCount = 1,
-        };
-        _layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-        // 初始高度，首次翻译后由 UpdateRowWeights 按内容比例接管
-        _layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 76F));
-        _layout.Controls.Add(_sourceCard, 0, 0);
-        Controls.Add(_layout);
-
-        // 宽度变化会改变折行，重新按内容分配行高
-        Resize += (_, _) => UpdateRowWeights();
+        _resultsHost = new Panel { AutoScroll = true };
+        _resultsLayout = new TableLayoutPanel { Dock = DockStyle.Top, ColumnCount = 1 };
+        _resultsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        _resultsHost.Controls.Add(_resultsLayout);
+        Controls.Add(_sourceCard);
+        Controls.Add(_resultsHost);
 
         // 停止输入片刻后自动翻译，行为与 AIxyz 一致
         _autoTranslateTimer = new System.Windows.Forms.Timer { Interval = 700 };
@@ -90,6 +88,8 @@ internal sealed class TranslateForm : Form
 
         // 启动时按当前启用的翻译服务预建结果面板，后续显示直接复用
         RebuildPanels(Math.Max(1, TranslationService.CreateEnabledTranslators(_getSettings()).Count));
+        ResumeLayout();
+        ClientSizeChanged += (_, _) => LayoutPanes();
     }
 
     public void ShowTranslation(string text)
@@ -108,6 +108,7 @@ internal sealed class TranslateForm : Form
         // 弹出时置顶一次拉到前台，随后取消置顶，不遮挡其他窗口
         TopMost = true;
         Show();
+        LayoutPanes();
         Activate();
         BeginInvoke(() => TopMost = false);
         StartTranslation(text, settings, force: true);
@@ -139,8 +140,7 @@ internal sealed class TranslateForm : Form
 
     private void OnSourceBoxTextChanged(object? sender, EventArgs e)
     {
-        // 无论手动还是程序赋值，输入栏高度都随内容重新分配
-        UpdateRowWeights();
+        UpdateSourceScrollBar();
         if (_suppressTextChanged)
         {
             return;
@@ -190,6 +190,7 @@ internal sealed class TranslateForm : Form
             Y = Bounds.Y,
             Width = Bounds.Width,
             Height = Bounds.Height,
+            Dpi = DeviceDpi,
         };
         _persistSettings();
     }
@@ -199,28 +200,49 @@ internal sealed class TranslateForm : Form
         Screen cursorScreen = Screen.FromPoint(Cursor.Position);
         Rectangle workingArea = cursorScreen.WorkingArea;
 
-        WindowBounds saved = settings.TranslateWindow;
-        if (!saved.IsEmpty)
+        // 先将隐藏窗口移到目标屏幕，等系统更新窗口 DPI 后再恢复尺寸。
+        if (!Screen.FromHandle(Handle).Equals(cursorScreen))
         {
-            Rectangle savedBounds = new(saved.X, saved.Y, saved.Width, saved.Height);
-            if (workingArea.IntersectsWith(savedBounds))
-            {
-                Bounds = savedBounds;
-                return;
-            }
-
-            // 记忆的位置不在鼠标所在屏幕时，沿用记忆尺寸并居中到当前屏幕
-            Size size = ClampSize(savedBounds.Size, workingArea);
-            Bounds = CenterIn(workingArea, size);
-            return;
+            Bounds = CenterIn(workingArea, new Size(
+                Math.Min(Width, workingArea.Width), Math.Min(Height, workingArea.Height)));
         }
 
-        Bounds = CenterIn(workingArea, ClampSize(new Size(600, 480), workingArea));
+        UpdateMinimumSize();
+        WindowBounds saved = settings.TranslateWindow;
+        Rectangle savedBounds = new(saved.X, saved.Y, saved.Width, saved.Height);
+        // 旧版只存像素尺寸，首次恢复按原尺寸处理。
+        int savedDpi = saved.Dpi > 0 ? saved.Dpi : DeviceDpi;
+        Size size = saved.IsEmpty
+            ? SizeFromClientSize(LogicalToDeviceUnits(new Size(780, 250)))
+            : new Size((int)Math.Round(saved.Width * (double)DeviceDpi / savedDpi),
+                (int)Math.Round(saved.Height * (double)DeviceDpi / savedDpi));
+        size = new Size(
+            Math.Clamp(size.Width, Math.Min(MinimumSize.Width, workingArea.Width), workingArea.Width),
+            Math.Clamp(size.Height, Math.Min(MinimumSize.Height, workingArea.Height), workingArea.Height));
+
+        if (!saved.IsEmpty && workingArea.IntersectsWith(savedBounds) &&
+            Screen.FromRectangle(savedBounds).Equals(cursorScreen))
+        {
+            Bounds = new Rectangle(
+                Math.Clamp(saved.X, workingArea.Left, workingArea.Right - size.Width),
+                Math.Clamp(saved.Y, workingArea.Top, workingArea.Bottom - size.Height),
+                size.Width, size.Height);
+        }
+        else
+        {
+            Bounds = CenterIn(workingArea, size);
+        }
     }
 
-    private static Size ClampSize(Size size, Rectangle workingArea) => new(
-        Math.Min(size.Width, workingArea.Width),
-        Math.Min(size.Height, workingArea.Height));
+    protected override void OnDpiChanged(DpiChangedEventArgs e)
+    {
+        base.OnDpiChanged(e);
+        BeginInvoke(() =>
+        {
+            UpdateMinimumSize();
+            LayoutPanes();
+        });
+    }
 
     private static Rectangle CenterIn(Rectangle workingArea, Size size) => new(
         workingArea.X + (workingArea.Width - size.Width) / 2,
@@ -281,13 +303,12 @@ internal sealed class TranslateForm : Form
 
                 try
                 {
-                    // 流式 token 到达即刷新面板，行高随内容增长实时重分配
+                    // 流式 token 到达即刷新译文
                     BeginInvoke(() =>
                     {
                         if (panelMap.TryGetValue(translator, out ResultPanel? panel) && !panel.IsDisposed)
                         {
                             panel.ShowStreaming(partial);
-                            UpdateRowWeights();
                         }
                     });
                 }
@@ -310,7 +331,6 @@ internal sealed class TranslateForm : Form
                         if (panelMap.TryGetValue(translator, out ResultPanel? panel) && !panel.IsDisposed)
                         {
                             panel.ShowResult(result);
-                            UpdateRowWeights();
                         }
                     });
                 }
@@ -321,7 +341,7 @@ internal sealed class TranslateForm : Form
             });
     }
 
-    // 按启用的翻译服务数量增删结果面板并重排行高
+    // 按启用的翻译服务数量增删结果面板
     private void RebuildPanels(int count)
     {
         if (_panels.Count == count)
@@ -329,12 +349,12 @@ internal sealed class TranslateForm : Form
             return;
         }
 
-        _layout.SuspendLayout();
+        _resultsLayout.SuspendLayout();
         while (_panels.Count > count)
         {
             ResultPanel extra = _panels[^1];
             _panels.RemoveAt(_panels.Count - 1);
-            _layout.Controls.Remove(extra);
+            _resultsLayout.Controls.Remove(extra);
             extra.Dispose();
         }
 
@@ -344,75 +364,78 @@ internal sealed class TranslateForm : Form
             {
                 SourceTextProvider = () => _sourceBox.Text,
             };
+            _resultsLayout.Controls.Add(panel, 0, _panels.Count);
             _panels.Add(panel);
-            _layout.Controls.Add(panel, 0, _panels.Count);
         }
 
-        _layout.RowCount = 1 + count;
-        while (_layout.RowStyles.Count > _layout.RowCount)
-        {
-            _layout.RowStyles.RemoveAt(_layout.RowStyles.Count - 1);
-        }
-
-        while (_layout.RowStyles.Count < _layout.RowCount)
-        {
-            _layout.RowStyles.Add(new RowStyle());
-        }
-
+        _resultsLayout.RowCount = count;
+        _resultsLayout.RowStyles.Clear();
         for (int i = 0; i < count; i++)
         {
-            _layout.RowStyles[i + 1] = new RowStyle(SizeType.Percent, 100F / count);
-            _layout.SetCellPosition(_panels[i], new TableLayoutPanelCellPosition(0, i + 1));
-            _panels[i].Margin = new Padding(0, 0, 0, i == count - 1 ? 0 : 10);
+            _resultsLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F / count));
         }
 
-        _layout.ResumeLayout();
-        UpdateMinimumSize(count);
-        UpdateRowWeights();
+        _resultsLayout.ResumeLayout();
+        if (IsHandleCreated)
+        {
+            LayoutPanes();
+        }
     }
 
-    // 输入栏与各结果栏的行高统一按内容所需高度的比例分配
-    private void UpdateRowWeights()
+    private void LayoutPanes()
     {
-        if (_panels.Count == 0)
+        int inset = LogicalToDeviceUnits(12);
+        int gap = LogicalToDeviceUnits(10);
+        int width = Math.Max(0, ClientSize.Width - 2 * inset);
+        int height = Math.Max(0, ClientSize.Height - 2 * inset);
+        bool sideBySide = ClientSize.Width >= LogicalToDeviceUnits(560);
+        int sourceWidth = sideBySide ? (width - gap) * 43 / 100 : width;
+        int sourceHeight = sideBySide ? height : Math.Min(LogicalToDeviceUnits(96), height);
+        int resultsX = sideBySide ? sourceWidth + gap : 0;
+        int resultsY = sideBySide ? 0 : sourceHeight + gap;
+
+        _sourceCard.SuspendLayout();
+        _sourceCard.Padding = new Padding(inset, LogicalToDeviceUnits(8), inset, LogicalToDeviceUnits(8));
+        _sourceTitle.Height = Math.Max(_sourceTitle.PreferredHeight, LogicalToDeviceUnits(26));
+        _sourceCard.SetBounds(inset, inset, sourceWidth, sourceHeight);
+        _sourceCard.ResumeLayout();
+        UpdateSourceScrollBar();
+
+        _resultsLayout.SuspendLayout();
+        _resultsHost.SetBounds(inset + resultsX, inset + resultsY,
+            Math.Max(0, width - resultsX), Math.Max(0, height - resultsY));
+        // 结果多时滚动整列，每个结果仍有独立的正文滚动区。
+        _resultsLayout.Height = Math.Max(_resultsHost.ClientSize.Height,
+            _panels.Count * LogicalToDeviceUnits(104) - gap);
+        for (int i = 0; i < _panels.Count; i++)
+        {
+            _panels[i].Margin = new Padding(0, 0, 0, i == _panels.Count - 1 ? 0 : gap);
+            _panels[i].UpdateMetrics(DeviceDpi);
+        }
+        _resultsLayout.ResumeLayout();
+    }
+
+    private void UpdateSourceScrollBar()
+    {
+        if (!_sourceBox.IsHandleCreated)
         {
             return;
         }
 
-        float[] weights = new float[_panels.Count + 1];
-        // 保底权重，避免短内容面板被压到看不清
-        weights[0] = Math.Max(72, SourceDesiredHeight());
-        float total = weights[0];
-        for (int i = 0; i < _panels.Count; i++)
-        {
-            weights[i + 1] = Math.Max(104, _panels[i].DesiredHeight);
-            total += weights[i + 1];
-        }
-
-        _layout.SuspendLayout();
-        for (int i = 0; i < weights.Length; i++)
-        {
-            _layout.RowStyles[i] = new RowStyle(SizeType.Percent, weights[i] / total * 100F);
-        }
-
-        _layout.ResumeLayout();
+        int lines = _sourceBox.GetLineFromCharIndex(_sourceBox.TextLength) + 1;
+        float lineHeight = _sourceBox.Font.GetHeight(_sourceBox.DeviceDpi);
+        // 切换原生滚动条的显示状态，保留输入框句柄及撤销记录。
+        ShowScrollBar(_sourceBox.Handle, VerticalScrollBar, lines * lineHeight > _sourceBox.ClientSize.Height);
     }
 
-    // 输入卡片完整展示当前文本所需的高度
-    private int SourceDesiredHeight()
+    private void UpdateMinimumSize()
     {
-        string text = _sourceBox.Text.Length == 0 ? "A" : _sourceBox.Text;
-        int width = Math.Max(60, _sourceBox.ClientSize.Width);
-        int textHeight = TextRenderer.MeasureText(text, _sourceBox.Font,
-            new Size(width, int.MaxValue), TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl).Height;
-        return _sourceCard.Padding.Top + _sourceCard.Padding.Bottom + textHeight + 8;
+        Size min = SizeFromClientSize(LogicalToDeviceUnits(new Size(340, 234)));
+        Size workingArea = Screen.FromHandle(Handle).WorkingArea.Size;
+        MinimumSize = new Size(Math.Min(min.Width, workingArea.Width), Math.Min(min.Height, workingArea.Height));
     }
 
-    // 最小尺寸随结果面板数量变化，保证每张卡片至少能显示两行内容
-    private void UpdateMinimumSize(int panelCount)
-    {
-        int panels = Math.Max(1, panelCount);
-        int clientHeight = 24 + 76 + panels * 110;
-        MinimumSize = SizeFromClientSize(new Size(460, clientHeight));
-    }
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ShowScrollBar(IntPtr hWnd, int bar, [MarshalAs(UnmanagedType.Bool)] bool show);
 }
