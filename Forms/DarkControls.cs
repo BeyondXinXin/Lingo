@@ -68,8 +68,10 @@ internal sealed class RoundedInput : CardPanel
     public RoundedInput(Control inner)
     {
         CornerRadius = 6;
-        Padding = new Padding(9, 8, 9, 8);
-        Height = 42;
+        Padding = new Padding(9, 8, 9, 6);
+        Height = 36;
+        BackColor = Theme.MainBg;
+        BorderColor = Theme.PaneBorder;
 
         switch (inner)
         {
@@ -82,10 +84,10 @@ internal sealed class RoundedInput : CardPanel
         }
 
         inner.Dock = DockStyle.Fill;
-        inner.BackColor = Theme.StressBg;
+        inner.BackColor = BackColor;
         inner.ForeColor = Theme.Text;
         inner.GotFocus += (_, _) => BorderColor = Theme.BorderFocus;
-        inner.LostFocus += (_, _) => BorderColor = Theme.Border;
+        inner.LostFocus += (_, _) => BorderColor = Theme.PaneBorder;
         Controls.Add(inner);
     }
 }
@@ -147,10 +149,10 @@ internal sealed class DarkButton : Button
         g.SmoothingMode = SmoothingMode.AntiAlias;
         Color background = _pressed ? Theme.PressedBg : _hovered ? Theme.HoverBg : Theme.TweakBg;
         Rectangle rect = new(0, 0, Width - 1, Height - 1);
-        using GraphicsPath path = Theme.RoundedRectangle(rect, CornerRadius);
+        using GraphicsPath path = Theme.RoundedRectangle(rect, LogicalToDeviceUnits(CornerRadius));
         using SolidBrush brush = new(background);
         g.FillPath(brush, path);
-        using Pen pen = new(Focused ? Theme.BorderFocus : Theme.Border);
+        using Pen pen = new(Focused ? Theme.BorderFocus : Theme.PaneBorder, DeviceDpi / 96F);
         g.DrawPath(pen, path);
 
         TextRenderer.DrawText(g, Text, Font, ClientRectangle, ForeColor,

@@ -5,7 +5,7 @@ using Lingo.Services;
 
 namespace Lingo.Forms;
 
-// AIxyz 风格设置窗口：顶部标签页切换，底部固定按钮栏
+// 设置窗口：顶部切换页面，底部固定保存和取消按钮
 internal sealed class SettingsForm : Form
 {
     private static readonly (string Code, string Display)[] Languages =
@@ -47,19 +47,25 @@ internal sealed class SettingsForm : Form
     private readonly List<CustomApiSettings> _apis;
     private int _currentApiIndex = -1;
 
-    private readonly List<(TabLabel Tab, Control Page)> _tabs = [];
+    private readonly List<(TabLabel Tab, TableLayoutPanel Page)> _tabs = [];
+    private readonly Panel _pageHost = new() { Dock = DockStyle.Fill, AutoScroll = true };
+    private int _selectedTab;
 
     public SettingsForm(AppSettings settings)
     {
         _original = settings;
 
+        SuspendLayout();
+        AutoScaleDimensions = new SizeF(96F, 96F);
+        AutoScaleMode = AutoScaleMode.Dpi;
+        Font = Theme.SettingsFont;
         Text = "Lingo 设置";
         Icon = AppIcon.Get();
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(540, 730);
+        ClientSize = new Size(460, 290);
         BackColor = Theme.MainBg;
         ForeColor = Theme.Text;
 
@@ -86,15 +92,16 @@ internal sealed class SettingsForm : Form
             FlatStyle = FlatStyle.Flat,
             BackColor = Theme.TweakBg,
             ForeColor = Theme.Text,
-            Width = 168,
+            Width = 152,
+            Margin = new Padding(0, 4, 0, 0),
         };
         _apiSelector.SelectedIndexChanged += OnApiSelectionChanged;
-        _apiAddButton = new DarkButton { Text = "添加", Size = new Size(54, 27), Margin = new Padding(8, 0, 0, 0) };
-        _apiRemoveButton = new DarkButton { Text = "删除", Size = new Size(54, 27), Margin = new Padding(6, 0, 0, 0) };
+        _apiAddButton = new DarkButton { Text = "添加", Size = new Size(52, 30), Margin = new Padding(8, 0, 0, 0) };
+        _apiRemoveButton = new DarkButton { Text = "删除", Size = new Size(52, 30), Margin = new Padding(6, 0, 0, 0) };
         _apiAddButton.Click += OnApiAddClicked;
         _apiRemoveButton.Click += OnApiRemoveClicked;
 
-        _customEnabledCheck = CreateCheckBox("启用该模型翻译（OpenAI 兼容）", false);
+        _customEnabledCheck = CreateCheckBox("启用此模型", false);
         _customNameBox = CreateTextBox(string.Empty);
         _endpointBox = CreateTextBox(string.Empty);
         _apiKeyBox = CreateTextBox(string.Empty);
@@ -114,6 +121,20 @@ internal sealed class SettingsForm : Form
 
         BuildLayout();
         RefreshApiSelector(_apis.Count > 0 ? 0 : -1);
+        ResumeLayout();
+    }
+
+    protected override void OnLoad(EventArgs e)
+    {
+        base.OnLoad(e);
+        FitSelectedPage();
+        CenterToScreen();
+    }
+
+    protected override void OnDpiChanged(DpiChangedEventArgs e)
+    {
+        base.OnDpiChanged(e);
+        BeginInvoke(FitSelectedPage);
     }
 
     public AppSettings? Result { get; private set; }
@@ -126,7 +147,8 @@ internal sealed class SettingsForm : Form
             Dock = DockStyle.Top,
             AutoSize = true,
             BackColor = Theme.MainBg,
-            Padding = new Padding(10, 8, 10, 0),
+            Padding = new Padding(14, 6, 14, 0),
+            WrapContents = false,
         };
 
         // 底部按钮栏
@@ -136,10 +158,11 @@ internal sealed class SettingsForm : Form
             Dock = DockStyle.Bottom,
             AutoSize = true,
             BackColor = Theme.MainBg,
-            Padding = new Padding(16, 6, 16, 12),
+            Padding = new Padding(14, 6, 14, 10),
+            WrapContents = false,
         };
-        DarkButton saveButton = new() { Text = "保存", Size = new Size(84, 32) };
-        DarkButton cancelButton = new() { Text = "取消", Size = new Size(84, 32), DialogResult = DialogResult.Cancel };
+        DarkButton saveButton = new() { Text = "保存", Size = new Size(76, 34), Margin = Padding.Empty };
+        DarkButton cancelButton = new() { Text = "取消", Size = new Size(76, 34), DialogResult = DialogResult.Cancel };
         cancelButton.Margin = new Padding(0, 0, 10, 0);
         saveButton.Click += OnSaveClicked;
         buttonPanel.Controls.Add(saveButton);
@@ -150,7 +173,8 @@ internal sealed class SettingsForm : Form
         {
             Dock = DockStyle.Fill,
             CornerRadius = 10,
-            Padding = new Padding(16, 14, 16, 14),
+            Padding = new Padding(16, 10, 16, 10),
+            BorderColor = Theme.PaneBorder,
         };
         Panel cardHost = new()
         {
@@ -161,11 +185,15 @@ internal sealed class SettingsForm : Form
         cardHost.Controls.Add(card);
 
         TableLayoutPanel generalPage = CreatePage();
-        AddRow(generalPage, "全局快捷键", Rounded(_hotkeyBox));
-        AddRow(generalPage, string.Empty, CreateHint("点击输入框后按下组合键，例如 Ctrl+Alt+T"));
+        AddRow(generalPage, "快捷键", Rounded(_hotkeyBox));
         AddRow(generalPage, "目标语言", _targetCombo);
         AddRow(generalPage, string.Empty, _startupCheck);
-        AddRow(generalPage, "版本", CreateHint("v" + ProductVersionText()));
+        AddRow(generalPage, "版本", new Label
+        {
+            Text = "v" + ProductVersionText(),
+            AutoSize = true,
+            ForeColor = Theme.TextMuted,
+        });
 
         TableLayoutPanel baiduPage = CreatePage();
         AddRow(baiduPage, string.Empty, _baiduEnabledCheck);
@@ -187,16 +215,16 @@ internal sealed class SettingsForm : Form
         AddRow(customPage, "模型配置", apiBar);
         AddRow(customPage, string.Empty, _customEnabledCheck);
         AddRow(customPage, "显示名称", Rounded(_customNameBox));
-        AddRow(customPage, "Endpoint", Rounded(_endpointBox));
+        AddRow(customPage, "OpenAI 接口", Rounded(_endpointBox));
         AddRow(customPage, "API 密钥", Rounded(_apiKeyBox));
         AddRow(customPage, "模型名称", Rounded(_modelBox));
-        AddRow(customPage, "Prompt", Rounded(_promptBox, height: 176));
-        AddRow(customPage, string.Empty, CreateHint("作为 System 消息固定发送，每次只传原文；留空则恢复默认 Prompt"));
+        AddRow(customPage, "提示词", Rounded(_promptBox, height: 94));
         AddRow(customPage, "超时（秒）", Rounded(_timeoutNumeric, width: 90));
 
-        card.Controls.Add(generalPage);
-        card.Controls.Add(baiduPage);
-        card.Controls.Add(customPage);
+        card.Controls.Add(_pageHost);
+        _pageHost.Controls.Add(generalPage);
+        _pageHost.Controls.Add(baiduPage);
+        _pageHost.Controls.Add(customPage);
 
         AddTab(tabBar, "常规", generalPage);
         AddTab(tabBar, "百度翻译", baiduPage);
@@ -220,7 +248,7 @@ internal sealed class SettingsForm : Form
         return plus >= 0 ? version[..plus] : version;
     }
 
-    private void AddTab(FlowLayoutPanel tabBar, string title, Control page)
+    private void AddTab(FlowLayoutPanel tabBar, string title, TableLayoutPanel page)
     {
         TabLabel tab = new(title);
         int index = _tabs.Count;
@@ -231,11 +259,33 @@ internal sealed class SettingsForm : Form
 
     private void SelectTab(int index)
     {
+        _selectedTab = index;
         for (int i = 0; i < _tabs.Count; i++)
         {
             _tabs[i].Tab.Selected = i == index;
             _tabs[i].Page.Visible = i == index;
         }
+
+        _pageHost.AutoScrollPosition = Point.Empty;
+        if (IsHandleCreated)
+        {
+            FitSelectedPage();
+        }
+    }
+
+    private void FitSelectedPage()
+    {
+        Rectangle workArea = Screen.FromHandle(Handle).WorkingArea;
+        Size nonClient = SizeFromClientSize(Size.Empty);
+        int width = Math.Min(LogicalToDeviceUnits(460), Math.Max(1, workArea.Width - nonClient.Width));
+        ClientSize = new Size(width, ClientSize.Height);
+        int chromeHeight = ClientSize.Height - _pageHost.Height;
+        int contentHeight = _tabs[_selectedTab].Page.Height;
+        int height = Math.Min(contentHeight + chromeHeight, Math.Max(1, workArea.Height - nonClient.Height));
+        ClientSize = new Size(width, height);
+        Location = new Point(
+            Math.Clamp(Left, workArea.Left, Math.Max(workArea.Left, workArea.Right - Width)),
+            Math.Clamp(Top, workArea.Top, Math.Max(workArea.Top, workArea.Bottom - Height)));
     }
 
     private void OnSaveClicked(object? sender, EventArgs e)
@@ -435,7 +485,7 @@ internal sealed class SettingsForm : Form
             BackColor = Theme.StressBg,
             Visible = false,
         };
-        page.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110F));
+        page.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 104F));
         page.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         return page;
     }
@@ -451,26 +501,18 @@ internal sealed class SettingsForm : Form
             AutoSize = true,
             Anchor = AnchorStyles.Left,
             ForeColor = Theme.Text,
-            Margin = new Padding(0, 11, 6, 0),
+            Margin = new Padding(0, 0, 12, 0),
         };
         if (control.Anchor != AnchorStyles.Left)
         {
             control.Anchor = AnchorStyles.Left | AnchorStyles.Right;
         }
 
-        control.Margin = new Padding(0, 4, 0, 4);
+        control.Margin = new Padding(0, 3, 0, 3);
 
         table.Controls.Add(label, 0, row);
         table.Controls.Add(control, 1, row);
     }
-
-    private static Label CreateHint(string text) => new()
-    {
-        Text = text,
-        AutoSize = true,
-        ForeColor = Theme.TextMuted,
-        Margin = new Padding(2, 0, 0, 6),
-    };
 
     private static ComboBox CreateLanguageCombo(bool includeFollowDefault, bool includeAuto)
     {
@@ -582,8 +624,10 @@ internal sealed class SettingsForm : Form
             base.OnPaint(e);
             if (_selected)
             {
-                using Pen pen = new(Theme.BorderFocus, 2F);
-                e.Graphics.DrawLine(pen, 4, Height - 2, Width - 4, Height - 2);
+                int inset = LogicalToDeviceUnits(4);
+                int y = Height - LogicalToDeviceUnits(2);
+                using Pen pen = new(Theme.BorderFocus, LogicalToDeviceUnits(2));
+                e.Graphics.DrawLine(pen, inset, y, Width - inset, y);
             }
         }
     }

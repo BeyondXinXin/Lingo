@@ -21,6 +21,7 @@ internal static class Theme
     public static readonly Color BorderFocus = Color.FromArgb(29, 147, 171);
 
     public static readonly Font TranslationFont = new("Microsoft YaHei UI", 11F);
+    public static readonly Font SettingsFont = new("Microsoft YaHei UI", 10F);
     private static readonly Font PaneTitleFont = new("Microsoft YaHei UI", 9F);
 
     public static Label CreatePaneTitle(string text) => new()
